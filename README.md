@@ -54,11 +54,15 @@ Usage: arpdvark [options]
 Options:
   -i <interface>    Network interface to scan (default: auto-detect)
   -t <seconds>      Refresh interval in seconds (default: 10)
-  -large            Allow scanning subnets larger than /16
+  --large           Allow scanning subnets larger than /16
+  --json            Run one scan and output JSON to stdout
+  --once            Run one scan and print a plain-text table to stdout
+  --mcp             Run as MCP server (stdio transport)
+  --version         Print version and exit
   -h                Show help
 ```
 
-**Examples:**
+### Interactive TUI (default)
 
 ```sh
 # Auto-detect interface, refresh every 10s
@@ -68,7 +72,7 @@ sudo arpdvark
 sudo arpdvark -i eth0 -t 5
 
 # Scan a large subnet (up to /8)
-sudo arpdvark -i eth0 -large
+sudo arpdvark -i eth0 --large
 ```
 
 **Key bindings:**
@@ -81,6 +85,68 @@ sudo arpdvark -i eth0 -large
 | `e` | Edit label for selected row |
 | `Enter` | Save label (empty to clear) |
 | `Esc` | Cancel label edit |
+
+### JSON output (`--json`)
+
+```sh
+sudo arpdvark --json
+sudo arpdvark --json -i eth0
+```
+
+Runs a single scan, prints a JSON array to stdout, and exits. Suitable for piping to `jq`, scripts, or other tools.
+
+```json
+[
+  {
+    "ip": "192.168.1.1",
+    "mac": "aa:bb:cc:dd:ee:ff",
+    "vendor": "Cisco Systems",
+    "hostname": "router.local",
+    "label": "main-router",
+    "first_seen": "2024-01-01T00:00:00Z",
+    "last_seen": "2024-01-01T00:00:00Z"
+  }
+]
+```
+
+### Plain-text table (`--once`)
+
+```sh
+sudo arpdvark --once
+```
+
+Runs a single scan, prints a tab-aligned text table to stdout, and exits. Parseable with `awk`/`cut`.
+
+### MCP server (`--mcp`)
+
+```sh
+arpdvark --mcp
+```
+
+Runs an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server on stdio, exposing a `scan_network` tool. This allows AI agents (e.g. Claude Desktop) to scan your network programmatically.
+
+**Claude Desktop configuration:**
+
+```json
+{
+  "mcpServers": {
+    "arpdvark": {
+      "command": "sudo",
+      "args": ["/path/to/arpdvark", "--mcp"]
+    }
+  }
+}
+```
+
+### Exit codes
+
+Exit codes apply to `--json` and `--once` modes:
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success (devices found) |
+| 1 | Error (permissions, interface not found, scan failure) |
+| 2 | Scan completed but no devices found |
 
 ## Permissions
 

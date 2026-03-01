@@ -12,6 +12,10 @@
 - `make build-all` → `dist/arpdvark-linux-amd64` + `dist/arpdvark-linux-arm64`
 - Tests: `go test ./tags/... ./vendor_db/... ./output/... ./exitcode/...` (no build tag needed); `go test -tags linux ./tui/... ./scanner/...` (Linux-only, run in CI)
 
+## Documentation
+
+- When making user-facing changes (new features, changed flags, new CLI modes, changed behavior), always update README.md to reflect the changes
+
 ## Communication style
 
 - Keep responses short and direct
