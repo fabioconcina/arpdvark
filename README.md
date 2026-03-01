@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="arpdvark" width="600">
+  <img src="assets/banner.png" alt="arpdvark" width="400">
 </p>
 
 # arpdvark
