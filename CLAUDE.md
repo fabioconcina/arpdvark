@@ -10,7 +10,7 @@
 - Always Linux only (`GOOS=linux`)
 - `make build` → `./arpdvark` (local dev build)
 - `make build-all` → `dist/arpdvark-linux-amd64` + `dist/arpdvark-linux-arm64`
-- Tests: `go test ./tags/... ./vendor_db/...` (no build tag needed); `go test -tags linux ./tui/... ./scanner/...` (Linux-only, run in CI)
+- Tests: `go test ./tags/... ./vendor_db/... ./output/... ./exitcode/...` (no build tag needed); `go test -tags linux ./tui/... ./scanner/...` (Linux-only, run in CI)
 
 ## Communication style
 

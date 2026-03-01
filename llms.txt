@@ -1,0 +1,95 @@
+# arpdvark
+
+> ARP network scanner for Linux. Discovers devices on the local subnet, resolves hostnames, identifies hardware vendors, and supports persistent device labels.
+
+## Quick start
+
+Requires Linux and root/CAP_NET_RAW. Install from source:
+
+    git clone https://github.com/fabioconcina/arpdvark
+    cd arpdvark && make build
+    sudo ./arpdvark
+
+## CLI modes
+
+### Interactive TUI (default)
+
+    sudo arpdvark [-i <interface>] [-t <seconds>] [--large]
+
+Full-screen terminal UI with auto-refresh, keyboard navigation, and label editing.
+
+### JSON output (--json)
+
+    sudo arpdvark --json [-i <interface>] [--large]
+
+Single scan, JSON array to stdout. Suitable for piping to jq, scripts, or other tools.
+
+Output format:
+
+    [
+      {
+        "ip": "192.168.1.1",
+        "mac": "aa:bb:cc:dd:ee:ff",
+        "vendor": "Cisco Systems",
+        "hostname": "router.local",
+        "label": "main-router",
+        "first_seen": "2024-01-01T00:00:00Z",
+        "last_seen": "2024-01-01T00:00:00Z"
+      }
+    ]
+
+### Human-readable table (--once)
+
+    sudo arpdvark --once [-i <interface>] [--large]
+
+Single scan, tab-aligned text table to stdout. Parseable with awk/cut.
+
+### MCP server (--mcp)
+
+    arpdvark --mcp
+
+Runs an MCP (Model Context Protocol) server on stdio. Exposes a `scan_network` tool.
+
+Tool: scan_network
+  Parameters:
+    - interface (string, optional): network interface name (auto-detected if omitted)
+    - allow_large (boolean, optional): allow subnets larger than /16 (default: false)
+  Returns: JSON array of device objects (same schema as --json output)
+
+Claude Desktop configuration example:
+
+    {
+      "mcpServers": {
+        "arpdvark": {
+          "command": "sudo",
+          "args": ["/path/to/arpdvark", "--mcp"]
+        }
+      }
+    }
+
+## Exit codes
+
+- 0: success (devices found)
+- 1: error (permissions, interface not found, scan failure)
+- 2: scan completed but no devices found (--json and --once only)
+
+## Flags
+
+    -i <interface>  Network interface (default: auto-detect)
+    -t <seconds>    Refresh interval for TUI mode (default: 10)
+    --large         Allow subnets larger than /16
+    --json          Single scan, JSON output, exit
+    --once          Single scan, text table output, exit
+    --mcp           Run as MCP server (stdio)
+    --version       Print version and exit
+
+## Permissions
+
+Uses raw ARP sockets (AF_PACKET). Requires sudo or CAP_NET_RAW:
+
+    sudo setcap cap_net_raw+ep ./arpdvark
+
+## Labels
+
+Devices can be labeled by MAC address. Labels persist in ~/.config/arpdvark/tags.json
+and are included in all output modes (TUI, JSON, table, MCP).
