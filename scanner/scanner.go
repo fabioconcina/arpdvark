@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"arpdvark/vendor_db"
+	"github.com/fabioconcina/arpdvark/vendor_db"
 
 	"golang.org/x/time/rate"
 )

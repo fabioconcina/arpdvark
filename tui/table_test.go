@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"arpdvark/scanner"
+	"github.com/fabioconcina/arpdvark/scanner"
 )
 
 func TestHumanDuration(t *testing.T) {

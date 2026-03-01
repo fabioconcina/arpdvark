@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"arpdvark/scanner"
+	"github.com/fabioconcina/arpdvark/scanner"
 )
 
 // ScanCompleteMsg is sent when a scan finishes (successfully or not).

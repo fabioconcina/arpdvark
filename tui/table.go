@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
 
-	"arpdvark/scanner"
+	"github.com/fabioconcina/arpdvark/scanner"
 )
 
 const (

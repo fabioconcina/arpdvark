@@ -1,4 +1,4 @@
-module arpdvark
+module github.com/fabioconcina/arpdvark
 
 go 1.24.0
 

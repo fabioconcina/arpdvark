@@ -9,25 +9,34 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"arpdvark/scanner"
-	"arpdvark/tui"
+	"github.com/fabioconcina/arpdvark/scanner"
+	"github.com/fabioconcina/arpdvark/tui"
 )
+
+var version = "dev"
 
 func main() {
 	var (
-		ifaceName  string
-		interval   int
-		allowLarge bool
+		ifaceName   string
+		interval    int
+		allowLarge  bool
+		showVersion bool
 	)
 
 	flag.StringVar(&ifaceName, "i", "", "Network interface to scan (default: auto-detect)")
 	flag.IntVar(&interval, "t", 10, "Refresh interval in seconds")
 	flag.BoolVar(&allowLarge, "large", false, "Allow scanning subnets larger than /16")
+	flag.BoolVar(&showVersion, "version", false, "Print version and exit")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: arpdvark [options]\n\nOptions:\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+
+	if showVersion {
+		fmt.Println("arpdvark", version)
+		return
+	}
 
 	if interval < 1 {
 		fmt.Fprintln(os.Stderr, "Error: refresh interval must be at least 1 second")
