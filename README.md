@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.png" alt="arpdvark" width="600">
+</p>
+
 # arpdvark
 
 > **Experimental project** — built to learn Go, TUI development, and raw networking. Intended for use on home networks only. Not hardened for production or adversarial environments.
