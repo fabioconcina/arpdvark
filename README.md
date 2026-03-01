@@ -26,7 +26,8 @@ A minimal, fast terminal-based network inventory tool. Scans your local network 
 - **MAC vendor lookup** — identifies hardware vendors from the embedded [IEEE OUI registry](https://standards-oui.ieee.org/oui/oui.txt) (~39k entries)
 - **Locally administered MAC detection** — flags randomized, VM-assigned, or manually set MACs as `Local/Randomized` (these have no OUI entry by design)
 - **Full-screen TUI** — fills the terminal, resizes dynamically, auto-refreshes on a configurable interval
-- **Persistent device table** — devices seen in previous scans remain visible; `LastSeen` is updated on each round
+- **Persistent device table** — devices seen in previous scans remain visible; `LastSeen`, MAC, and vendor are updated on each round
+- **Rate-limited scanning** — ARP requests are rate-limited (1000 pkt/s for /24 and smaller, 5000 pkt/s for larger subnets) to avoid overwhelming switches or triggering IDS alerts
 
 ## Installation
 
@@ -87,7 +88,7 @@ sudo setcap cap_net_raw+ep ./arpdvark
 Hostnames are resolved concurrently for all discovered devices after each ARP sweep. Three methods are tried in order:
 
 1. **System resolver** — uses `/etc/resolv.conf`. Works if your DNS server (e.g. Pi-hole with DHCP enabled) maintains PTR records.
-2. **Gateway DNS** — queries the first host in the subnet (typically the router) directly on port 53. Home routers running dnsmasq create PTR records for DHCP leases automatically.
+2. **Gateway DNS** — queries the default gateway (read from `/proc/net/route`, falling back to the first host in the subnet) directly on port 53. Home routers running dnsmasq create PTR records for DHCP leases automatically.
 3. **mDNS unicast** — sends a PTR query to the device's port 5353. Works for Apple devices (Bonjour) and Linux hosts running Avahi.
 
 If all three fail (e.g. the device has a randomized MAC and no mDNS), the hostname column is left empty.

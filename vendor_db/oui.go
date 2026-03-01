@@ -5,19 +5,15 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"sync"
 )
 
 //go:embed oui.txt
 var ouiData string
 
-var (
-	db   map[string]string
-	once sync.Once
-)
+var db map[string]string
 
 func init() {
-	once.Do(parseOUI)
+	parseOUI()
 }
 
 // parseOUI reads the embedded oui.txt and builds the lookup map.

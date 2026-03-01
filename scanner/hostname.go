@@ -1,19 +1,58 @@
 package scanner
 
 import (
+	"bufio"
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"net"
+	"os"
 	"strings"
 	"time"
 )
 
-// gatewayIP returns the first host in the subnet (conventionally the router).
+// gatewayIP returns the default gateway IP by reading the Linux routing table.
+// Falls back to the first host in the subnet if the routing table is unavailable.
 func gatewayIP(subnet *net.IPNet) string {
+	if gw := gatewayFromRoute(); gw != "" {
+		return gw
+	}
 	base := binary.BigEndian.Uint32(subnet.IP.To4())
 	ip := make(net.IP, 4)
 	binary.BigEndian.PutUint32(ip, base+1)
 	return ip.String()
+}
+
+// gatewayFromRoute reads /proc/net/route and returns the default gateway IP.
+// Returns "" if the file cannot be read or no default route is found.
+func gatewayFromRoute() string {
+	f, err := os.Open("/proc/net/route")
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Scan() // skip header line
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 3 {
+			continue
+		}
+		// Default route: Destination == "00000000"
+		if fields[1] != "00000000" {
+			continue
+		}
+		// Gateway is a little-endian hex-encoded 32-bit IP.
+		gwHex := fields[2]
+		b, err := hex.DecodeString(gwHex)
+		if err != nil || len(b) != 4 {
+			continue
+		}
+		// /proc/net/route stores IPs in native (little-endian on x86/ARM) byte order.
+		return net.IPv4(b[3], b[2], b[1], b[0]).String()
+	}
+	return ""
 }
 
 // lookupHostname resolves an IP to a hostname by trying three methods in order:

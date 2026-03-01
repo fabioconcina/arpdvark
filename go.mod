@@ -1,12 +1,13 @@
 module arpdvark
 
-go 1.22
+go 1.24.0
 
 require (
 	github.com/charmbracelet/bubbles v0.20.0
 	github.com/charmbracelet/bubbletea v1.2.4
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/mdlayher/arp v0.0.0-20220512170110-6706a2966875
+	golang.org/x/time v0.14.0
 )
 
 require (

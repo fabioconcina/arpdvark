@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"fmt"
 	"net"
 	"net/netip"
 	"time"
@@ -20,11 +21,11 @@ func dialARP(iface *net.Interface) (*arp.Client, error) {
 func sendARP(client *arp.Client, targetIP, srcIP net.IP, srcMAC net.HardwareAddr) error {
 	src, ok := netip.AddrFromSlice(srcIP.To4())
 	if !ok {
-		return nil
+		return fmt.Errorf("invalid source IP: %v", srcIP)
 	}
 	dst, ok := netip.AddrFromSlice(targetIP.To4())
 	if !ok {
-		return nil
+		return fmt.Errorf("invalid target IP: %v", targetIP)
 	}
 	pkt, err := arp.NewPacket(
 		arp.OperationRequest,
@@ -39,20 +40,26 @@ func sendARP(client *arp.Client, targetIP, srcIP net.IP, srcMAC net.HardwareAddr
 	return client.WriteTo(pkt, net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff})
 }
 
-func collectReplies(client *arp.Client, deadline time.Time) []arpReply {
+func collectReplies(client *arp.Client, done <-chan struct{}) []arpReply {
 	var replies []arpReply
-	if err := client.SetReadDeadline(deadline); err != nil {
-		return replies
-	}
 	for {
+		// Use a short read deadline so we can check the done signal between reads.
+		if err := client.SetReadDeadline(time.Now().Add(200 * time.Millisecond)); err != nil {
+			return replies
+		}
 		pkt, _, err := client.Read()
 		if err != nil {
-			break
+			// Check if we've been told to stop.
+			select {
+			case <-done:
+				return replies
+			default:
+				continue
+			}
 		}
 		if pkt.Operation == arp.OperationReply {
 			ip := net.IP(pkt.SenderIP.AsSlice())
 			replies = append(replies, arpReply{IP: ip, MAC: pkt.SenderHardwareAddr})
 		}
 	}
-	return replies
 }

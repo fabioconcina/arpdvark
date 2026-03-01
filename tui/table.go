@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
@@ -134,15 +133,6 @@ func renderView(m M) string {
 		bs = bs.Width(m.width - 2)
 	}
 	return bs.Render(body)
-}
-
-// truncate shortens s to maxLen runes, appending "…" if needed.
-func truncate(s string, maxLen int) string {
-	if utf8.RuneCountInString(s) <= maxLen {
-		return s
-	}
-	runes := []rune(s)
-	return string(runes[:maxLen-1]) + "…"
 }
 
 // humanDuration formats a duration as a short human-readable string.

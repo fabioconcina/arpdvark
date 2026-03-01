@@ -12,4 +12,9 @@ curl -fsSL https://standards-oui.ieee.org/oui/oui.txt \
   | grep '(hex)' > "$OUT"
 
 COUNT=$(wc -l < "$OUT")
+if [ "$COUNT" -lt 1000 ]; then
+  echo "Error: downloaded OUI database has only $COUNT entries (expected 10000+). File may be truncated or corrupt." >&2
+  rm -f "$OUT"
+  exit 1
+fi
 echo "Done. $COUNT entries written to vendor_db/oui.txt"

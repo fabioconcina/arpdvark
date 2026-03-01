@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 	"time"
 
 	"arpdvark/vendor_db"
+
+	"golang.org/x/time/rate"
 )
 
 // Device represents a discovered network host.
@@ -93,19 +96,36 @@ func (s *Scanner) Subnet() string { return s.subnet.String() }
 
 // Scan performs one ARP sweep and returns the merged device list.
 func (s *Scanner) Scan(ctx context.Context) ([]Device, error) {
-	client, err := dialARP(s.iface)
+	// Use separate clients for sending and receiving to avoid
+	// concurrent read/write on a single arp.Client.
+	recvClient, err := dialARP(s.iface)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open ARP socket (try running with sudo): %w", err)
 	}
-	defer client.Close()
+	defer recvClient.Close()
+
+	sendClient, err := dialARP(s.iface)
+	if err != nil {
+		return nil, fmt.Errorf("cannot open ARP socket (try running with sudo): %w", err)
+	}
+	defer sendClient.Close()
 
 	hosts := hostsInSubnet(s.subnet)
-	deadline := time.Now().Add(2 * time.Second)
 
+	// Start collecting replies; it runs until we close doneCh.
+	doneCh := make(chan struct{})
 	replyCh := make(chan []arpReply, 1)
 	go func() {
-		replyCh <- collectReplies(client, deadline)
+		replyCh <- collectReplies(recvClient, doneCh)
 	}()
+
+	// Rate-limit sends: 1000 pkt/s for small subnets, 5000 for larger ones.
+	ones, _ := s.subnet.Mask.Size()
+	pps := rate.Limit(1000)
+	if ones < 24 {
+		pps = 5000
+	}
+	limiter := rate.NewLimiter(pps, int(pps))
 
 	workers := len(hosts)
 	if workers > 256 {
@@ -115,6 +135,9 @@ func (s *Scanner) Scan(ctx context.Context) ([]Device, error) {
 	var wg sync.WaitGroup
 outer:
 	for _, ip := range hosts {
+		if err := limiter.Wait(ctx); err != nil {
+			break outer
+		}
 		select {
 		case <-ctx.Done():
 			break outer
@@ -124,11 +147,17 @@ outer:
 		go func(target net.IP) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			_ = sendARP(client, target, s.srcIP, s.iface.HardwareAddr)
+			_ = sendARP(sendClient, target, s.srcIP, s.iface.HardwareAddr)
 		}(ip)
 	}
 	wg.Wait()
 
+	// Give stragglers 2 seconds to reply, then stop the collector.
+	select {
+	case <-ctx.Done():
+	case <-time.After(2 * time.Second):
+	}
+	close(doneCh)
 	replies := <-replyCh
 
 	// Resolve hostnames concurrently: system DNS → gateway DNS → mDNS unicast.
@@ -166,6 +195,9 @@ outer:
 				Vendor:    vendor_db.Lookup(r.MAC),
 				FirstSeen: now,
 			}
+		} else if !bytes.Equal(existing.MAC, r.MAC) {
+			existing.MAC = r.MAC
+			existing.Vendor = vendor_db.Lookup(r.MAC)
 		}
 		existing.Hostname = hostnames[key]
 		existing.LastSeen = now
