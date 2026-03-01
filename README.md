@@ -4,6 +4,12 @@
 
 # arpdvark
 
+[![CI](https://github.com/fabioconcina/arpdvark/actions/workflows/ci.yml/badge.svg)](https://github.com/fabioconcina/arpdvark/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/fabioconcina/arpdvark)](https://goreportcard.com/report/github.com/fabioconcina/arpdvark)
+[![GitHub release](https://img.shields.io/github/v/release/fabioconcina/arpdvark)](https://github.com/fabioconcina/arpdvark/releases/latest)
+[![Go version](https://img.shields.io/github/go-mod/go-version/fabioconcina/arpdvark)](go.mod)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 > **Experimental project** — built to learn Go, TUI development, and raw networking. Intended for use on home networks only. Not hardened for production or adversarial environments.
 
 A minimal, fast terminal-based network inventory tool. Scans your local network using ARP, identifies connected devices, resolves hostnames and MAC vendors, and displays results in a full-screen auto-refreshing TUI.
