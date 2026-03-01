@@ -46,7 +46,7 @@ func TestDevicesToRows(t *testing.T) {
 			Vendor:   "Unknown",
 		},
 	}
-	rows := devicesToRows(devices)
+	rows := devicesToRows(devices, nil)
 	if len(rows) != 2 {
 		t.Fatalf("devicesToRows() = %d rows, want 2", len(rows))
 	}
@@ -60,8 +60,13 @@ func TestDevicesToRows(t *testing.T) {
 	if rows[0][2] != "router.home" {
 		t.Errorf("rows[0][2] = %q, want %q", rows[0][2], "router.home")
 	}
-	if rows[0][3] != "Acme Corp" {
-		t.Errorf("rows[0][3] = %q, want %q", rows[0][3], "Acme Corp")
+	// index 3 = Label (empty, no tags passed)
+	if rows[0][3] != "" {
+		t.Errorf("rows[0][3] (label) = %q, want \"\"", rows[0][3])
+	}
+	// index 4 = Vendor
+	if rows[0][4] != "Acme Corp" {
+		t.Errorf("rows[0][4] = %q, want %q", rows[0][4], "Acme Corp")
 	}
 
 	if rows[1][2] != "" {
@@ -70,8 +75,33 @@ func TestDevicesToRows(t *testing.T) {
 }
 
 func TestDevicesToRows_Empty(t *testing.T) {
-	rows := devicesToRows(nil)
+	rows := devicesToRows(nil, nil)
 	if len(rows) != 0 {
 		t.Errorf("devicesToRows(nil) = %d rows, want 0", len(rows))
+	}
+}
+
+func TestDevicesToRows_WithLabels(t *testing.T) {
+	mac := net.HardwareAddr{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF}
+	devices := []scanner.Device{
+		{IP: net.ParseIP("192.168.1.1").To4(), MAC: mac, Hostname: "router", Vendor: "Acme"},
+	}
+	labels := map[string]string{"aa:bb:cc:dd:ee:ff": "my-router"}
+	rows := devicesToRows(devices, labels)
+	if rows[0][3] != "my-router" {
+		t.Errorf("label col = %q, want %q", rows[0][3], "my-router")
+	}
+	if rows[0][4] != "Acme" {
+		t.Errorf("vendor col = %q, want %q", rows[0][4], "Acme")
+	}
+}
+
+func TestDevicesToRows_NoLabel(t *testing.T) {
+	devices := []scanner.Device{
+		{IP: net.ParseIP("192.168.1.2").To4(), MAC: net.HardwareAddr{0x11, 0x22, 0x33, 0x44, 0x55, 0x66}},
+	}
+	rows := devicesToRows(devices, nil)
+	if rows[0][3] != "" {
+		t.Errorf("label col = %q, want empty", rows[0][3])
 	}
 }

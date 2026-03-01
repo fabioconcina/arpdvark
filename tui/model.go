@@ -2,12 +2,15 @@ package tui
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/fabioconcina/arpdvark/scanner"
+	"github.com/fabioconcina/arpdvark/tags"
 )
 
 // ScanCompleteMsg is sent when a scan finishes (successfully or not).
@@ -21,6 +24,13 @@ type TickMsg time.Time
 
 // splashDoneMsg is sent after the splash screen timer expires.
 type splashDoneMsg struct{}
+
+// labelSavedMsg is sent after a tag write completes (success or error).
+type labelSavedMsg struct {
+	mac   string
+	label string
+	err   error
+}
 
 // M is the Bubbletea model for arpdvark.
 type M struct {
@@ -37,18 +47,32 @@ type M struct {
 	height   int
 	version  string
 	splash   bool
+
+	tagStore  *tags.Store
+	tags      map[string]string // mac → label, mirrored from tagStore
+	editing   bool
+	editInput textinput.Model
+	editMAC   string
 }
 
 // New creates a new TUI model.
-func New(sc *scanner.Scanner, interval time.Duration, version string) M {
+func New(sc *scanner.Scanner, store *tags.Store, interval time.Duration, version string) M {
+	ti := textinput.New()
+	ti.Placeholder = "enter label (empty to clear)"
+	ti.CharLimit = 64
+	ti.Width = 40
+
 	return M{
-		tbl:      newTable(),
-		iface:    sc.Interface(),
-		subnet:   sc.Subnet(),
-		interval: interval,
-		sc:       sc,
-		version:  version,
-		splash:   true,
+		tbl:       newTable(),
+		iface:     sc.Interface(),
+		subnet:    sc.Subnet(),
+		interval:  interval,
+		sc:        sc,
+		version:   version,
+		splash:    true,
+		tagStore:  store,
+		tags:      store.All(),
+		editInput: ti,
 	}
 }
 
@@ -74,6 +98,28 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m = applySize(m)
 
 	case tea.KeyMsg:
+		if m.editing {
+			switch msg.String() {
+			case "enter":
+				label := strings.TrimSpace(m.editInput.Value())
+				mac := m.editMAC
+				store := m.tagStore
+				return m, func() tea.Msg {
+					err := store.Set(mac, label)
+					return labelSavedMsg{mac: mac, label: label, err: err}
+				}
+			case "esc":
+				m.editing = false
+				m.editInput.Blur()
+				m.editMAC = ""
+				return m, nil
+			default:
+				var cmd tea.Cmd
+				m.editInput, cmd = m.editInput.Update(msg)
+				return m, cmd
+			}
+		}
+
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -84,11 +130,41 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, scanCmd(m.sc)
 			}
 
+		case "e":
+			if len(m.devices) == 0 {
+				return m, nil
+			}
+			sel := m.tbl.SelectedRow()
+			if sel == nil {
+				return m, nil
+			}
+			mac := sel[1]
+			m.editMAC = mac
+			m.editInput.SetValue(m.tags[mac])
+			m.editInput.Focus()
+			m.editing = true
+			return m, textinput.Blink
+
 		case "up", "k":
 			m.tbl.MoveUp(1)
 		case "down", "j":
 			m.tbl.MoveDown(1)
 		}
+
+	case labelSavedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+		} else {
+			if msg.label == "" {
+				delete(m.tags, msg.mac)
+			} else {
+				m.tags[msg.mac] = msg.label
+			}
+			m.tbl.SetRows(devicesToRows(m.devices, m.tags))
+		}
+		m.editing = false
+		m.editInput.Blur()
+		m.editMAC = ""
 
 	case ScanCompleteMsg:
 		m.scanning = false
@@ -98,7 +174,7 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.err = nil
 			m.devices = msg.Devices
-			m.tbl.SetRows(devicesToRows(m.devices))
+			m.tbl.SetRows(devicesToRows(m.devices, m.tags))
 		}
 		return m, tea.Tick(m.interval, func(t time.Time) tea.Msg {
 			return TickMsg(t)

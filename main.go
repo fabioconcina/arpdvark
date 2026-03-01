@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/fabioconcina/arpdvark/scanner"
+	"github.com/fabioconcina/arpdvark/tags"
 	"github.com/fabioconcina/arpdvark/tui"
 )
 
@@ -55,7 +56,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	m := tui.New(sc, time.Duration(interval)*time.Second, version)
+	store, err := tags.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not load tags file: %v\n", err)
+		store = tags.Empty()
+	}
+
+	m := tui.New(sc, store, time.Duration(interval)*time.Second, version)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

@@ -15,6 +15,7 @@ const (
 	colWidthIP       = 16
 	colWidthMAC      = 21
 	colWidthHostname = 28
+	colWidthLabel    = 20
 )
 
 var (
@@ -52,6 +53,7 @@ func newTable() table.Model {
 		{Title: "IP Address", Width: colWidthIP},
 		{Title: "MAC Address", Width: colWidthMAC},
 		{Title: "Hostname", Width: colWidthHostname},
+		{Title: "Label", Width: colWidthLabel},
 		{Title: "Vendor", Width: 30},
 	}
 	t := table.New(
@@ -73,8 +75,8 @@ func applySize(m M) M {
 	if m.width == 0 || m.height == 0 {
 		return m
 	}
-	// 2 chars for border (left + right), 8 for cell padding (4 cols × 2)
-	vendorWidth := m.width - 2 - colWidthIP - colWidthMAC - colWidthHostname - 8
+	// 2 chars for border (left + right), 10 for cell padding (5 cols × 2)
+	vendorWidth := m.width - 2 - colWidthIP - colWidthMAC - colWidthHostname - colWidthLabel - 10
 	if vendorWidth < 10 {
 		vendorWidth = 10
 	}
@@ -82,6 +84,7 @@ func applySize(m M) M {
 		{Title: "IP Address", Width: colWidthIP},
 		{Title: "MAC Address", Width: colWidthMAC},
 		{Title: "Hostname", Width: colWidthHostname},
+		{Title: "Label", Width: colWidthLabel},
 		{Title: "Vendor", Width: vendorWidth},
 	})
 	// 2 border rows + 1 title + 1 status + 1 table header = 5 overhead rows
@@ -90,15 +93,22 @@ func applySize(m M) M {
 		tableHeight = 1
 	}
 	m.tbl.SetHeight(tableHeight)
-	m.tbl.SetRows(devicesToRows(m.devices))
+	m.tbl.SetRows(devicesToRows(m.devices, m.tags))
 	return m
 }
 
 // devicesToRows converts scanner devices to table rows.
-func devicesToRows(devices []scanner.Device) []table.Row {
+// tags is a mac→label map; nil is treated as empty.
+func devicesToRows(devices []scanner.Device, tags map[string]string) []table.Row {
 	rows := make([]table.Row, len(devices))
 	for i, d := range devices {
-		rows[i] = table.Row{d.IP.String(), d.MAC.String(), d.Hostname, d.Vendor}
+		rows[i] = table.Row{
+			d.IP.String(),
+			d.MAC.String(),
+			d.Hostname,
+			tags[d.MAC.String()],
+			d.Vendor,
+		}
 	}
 	return rows
 }
@@ -111,23 +121,28 @@ func renderView(m M) string {
 
 	tableStr := m.tbl.View()
 
-	var statusParts []string
-	statusParts = append(statusParts, fmt.Sprintf("%d device(s)", len(m.devices)))
+	var statusLine string
+	if m.editing {
+		statusLine = styleStatus.Render("Label for "+m.editMAC+":") + " " + m.editInput.View()
+	} else {
+		var statusParts []string
+		statusParts = append(statusParts, fmt.Sprintf("%d device(s)", len(m.devices)))
 
-	if m.scanning {
-		statusParts = append(statusParts, styleScanning.Render("scanning…"))
-	} else if !m.lastScan.IsZero() {
-		statusParts = append(statusParts, "last scan: "+humanDuration(time.Since(m.lastScan))+" ago")
+		if m.scanning {
+			statusParts = append(statusParts, styleScanning.Render("scanning…"))
+		} else if !m.lastScan.IsZero() {
+			statusParts = append(statusParts, "last scan: "+humanDuration(time.Since(m.lastScan))+" ago")
+		}
+
+		if m.err != nil {
+			statusParts = append(statusParts, styleErr.Render("error: "+m.err.Error()))
+		}
+
+		statusParts = append(statusParts, "e: label  r: rescan  q: quit")
+		statusLine = styleStatus.Render(strings.Join(statusParts, "  •  "))
 	}
 
-	if m.err != nil {
-		statusParts = append(statusParts, styleErr.Render("error: "+m.err.Error()))
-	}
-
-	statusParts = append(statusParts, "r: rescan  q: quit")
-	status := styleStatus.Render(strings.Join(statusParts, "  •  "))
-
-	body := strings.Join([]string{title, tableStr, status}, "\n")
+	body := strings.Join([]string{title, tableStr, statusLine}, "\n")
 	bs := styleBorder
 	if m.width > 0 {
 		bs = bs.Width(m.width - 2)
