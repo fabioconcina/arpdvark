@@ -15,6 +15,7 @@ import (
 
 var version = "dev"
 
+
 func main() {
 	var (
 		ifaceName   string
@@ -54,7 +55,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	m := tui.New(sc, time.Duration(interval)*time.Second)
+	m := tui.New(sc, time.Duration(interval)*time.Second, version)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

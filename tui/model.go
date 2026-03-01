@@ -19,6 +19,9 @@ type ScanCompleteMsg struct {
 // TickMsg is sent by the refresh timer to trigger the next scan.
 type TickMsg time.Time
 
+// splashDoneMsg is sent after the splash screen timer expires.
+type splashDoneMsg struct{}
+
 // M is the Bubbletea model for arpdvark.
 type M struct {
 	tbl      table.Model
@@ -32,27 +35,38 @@ type M struct {
 	sc       *scanner.Scanner
 	width    int
 	height   int
+	version  string
+	splash   bool
 }
 
 // New creates a new TUI model.
-func New(sc *scanner.Scanner, interval time.Duration) M {
+func New(sc *scanner.Scanner, interval time.Duration, version string) M {
 	return M{
 		tbl:      newTable(),
 		iface:    sc.Interface(),
 		subnet:   sc.Subnet(),
 		interval: interval,
 		sc:       sc,
+		version:  version,
+		splash:   true,
 	}
 }
 
-// Init triggers the first scan immediately.
+// Init shows the splash screen for 2 seconds before starting the first scan.
 func (m M) Init() tea.Cmd {
-	return scanCmd(m.sc)
+	return tea.Tick(2*time.Second, func(time.Time) tea.Msg {
+		return splashDoneMsg{}
+	})
 }
 
 // Update handles incoming messages.
 func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+
+	case splashDoneMsg:
+		m.splash = false
+		m.scanning = true
+		return m, scanCmd(m.sc)
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -102,6 +116,9 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the full TUI string.
 func (m M) View() string {
+	if m.splash {
+		return renderSplash(m)
+	}
 	return renderView(m)
 }
 

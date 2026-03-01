@@ -135,6 +135,26 @@ func renderView(m M) string {
 	return bs.Render(body)
 }
 
+// renderSplash renders the logo centered in the terminal for the splash screen.
+func renderSplash(m M) string {
+	g := lipgloss.NewStyle().Foreground(lipgloss.Color("82"))
+	d := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+
+	logo := g.Render(
+		"▄▀█ █▀█ █▀█ █▀▄ █ █ ▄▀█ █▀█ █▄▀\n" +
+			"█▀█ ██▀ █▀▀ █ █ ▀▄▀ █▀█ ██▀ ██▄\n" +
+			"▀ ▀ ▀ ▀ ▀   ▀▀  ▀ ▀ ▀ ▀ ▀ ▀ ▀ ▀",
+	)
+	sep := d.Render("─────────────────────────────────")
+	sub := "ARP network scanner  ·  " + m.version
+
+	content := logo + "\n" + sep + "\n" + sub
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	}
+	return content
+}
+
 // humanDuration formats a duration as a short human-readable string.
 func humanDuration(d time.Duration) string {
 	d = d.Round(time.Second)
