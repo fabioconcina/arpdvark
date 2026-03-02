@@ -14,7 +14,7 @@
 
 ## Documentation
 
-- When making user-facing changes (new features, changed flags, new CLI modes, changed behavior), always update README.md to reflect the changes
+- When making user-facing changes (new features, changed flags, new CLI modes, changed behavior), always update both README.md and llms.txt to reflect the changes
 
 ## Communication style
 
