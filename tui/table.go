@@ -37,12 +37,14 @@ var (
 	styleHeader = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("252")).
-			Background(lipgloss.Color("235"))
+			Background(lipgloss.Color("235")).
+			Padding(0, 1)
 
 	styleSelected = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("229")).
 			Background(lipgloss.Color("57")).
-			Bold(true)
+			Bold(true).
+			Padding(0, 1)
 
 	styleErr = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 )
