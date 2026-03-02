@@ -38,6 +38,7 @@ A minimal, fast terminal-based network inventory tool. Scans your local network 
 - **Full-screen TUI** — fills the terminal, resizes dynamically, auto-refreshes on a configurable interval
 - **Persistent device table** — devices seen in previous scans remain visible; `LastSeen`, MAC, and vendor are updated on each round
 - **Host labels** — assign custom names to any device; labels are keyed by MAC address and persist across restarts in `~/.config/arpdvark/tags.json`
+- **Multi-round first scan** — the first ARP sweep sends 3 rounds of requests (100 ms apart) to catch slow responders such as Wi-Fi clients in power-save mode; subsequent scans send a single round since the device table accumulates across sweeps
 - **Rate-limited scanning** — ARP requests are rate-limited (1000 pkt/s for /24 and smaller, 5000 pkt/s for larger subnets) to avoid overwhelming switches or triggering IDS alerts
 
 ## Installation

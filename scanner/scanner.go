@@ -32,8 +32,9 @@ type Scanner struct {
 	subnet     *net.IPNet
 	allowLarge bool
 
-	mu   sync.Mutex
-	seen map[string]Device
+	mu       sync.Mutex
+	seen     map[string]Device
+	scanNum  int
 }
 
 // New creates a Scanner for the given interface name.
@@ -133,22 +134,42 @@ func (s *Scanner) Scan(ctx context.Context) ([]Device, error) {
 	}
 	sem := make(chan struct{}, workers)
 	var wg sync.WaitGroup
+
+	// Send multiple rounds on the first scan to catch slow responders;
+	// subsequent scans only need one round since seen accumulates.
+	s.mu.Lock()
+	s.scanNum++
+	rounds := 1
+	if s.scanNum == 1 {
+		rounds = 3
+	}
+	s.mu.Unlock()
 outer:
-	for _, ip := range hosts {
-		if err := limiter.Wait(ctx); err != nil {
-			break outer
+	for round := 0; round < rounds; round++ {
+		if round > 0 {
+			select {
+			case <-ctx.Done():
+				break outer
+			case <-time.After(100 * time.Millisecond):
+			}
 		}
-		select {
-		case <-ctx.Done():
-			break outer
-		case sem <- struct{}{}:
+		for _, ip := range hosts {
+			if err := limiter.Wait(ctx); err != nil {
+				break outer
+			}
+			select {
+			case <-ctx.Done():
+				break outer
+			case sem <- struct{}{}:
+			}
+			wg.Add(1)
+			go func(target net.IP) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				_ = sendARP(sendClient, target, s.srcIP, s.iface.HardwareAddr)
+			}(ip)
 		}
-		wg.Add(1)
-		go func(target net.IP) {
-			defer wg.Done()
-			defer func() { <-sem }()
-			_ = sendARP(sendClient, target, s.srcIP, s.iface.HardwareAddr)
-		}(ip)
+		wg.Wait()
 	}
 	wg.Wait()
 

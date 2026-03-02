@@ -85,6 +85,14 @@ Claude Desktop configuration example:
 
 ## Permissions
 
+## Scanning behavior
+
+The first ARP sweep sends 3 rounds of requests (100 ms apart) to catch slow responders
+such as Wi-Fi clients in power-save mode. Subsequent scans send a single round since
+the device table accumulates across sweeps.
+
+## Permissions
+
 Uses raw ARP sockets (AF_PACKET). Requires sudo or CAP_NET_RAW:
 
     sudo setcap cap_net_raw+ep ./arpdvark
