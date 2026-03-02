@@ -3,11 +3,19 @@
 package tui
 
 import (
+	"os"
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/fabioconcina/arpdvark/state"
+	"github.com/muesli/termenv"
 )
+
+func TestMain(m *testing.M) {
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	os.Exit(m.Run())
+}
 
 func TestHumanDuration(t *testing.T) {
 	tests := []struct {
