@@ -2,6 +2,7 @@
 
 ## Versioning and releases
 
+- Always bump the version after implementing a change (before committing)
 - "bump the version and commit" means: update the git tag (e.g. v0.3.0), commit all changes, tag
 - "create a release" means: build both linux/amd64 and linux/arm64 via `make build-all`, then `gh release create`
 

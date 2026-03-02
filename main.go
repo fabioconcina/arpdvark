@@ -14,6 +14,7 @@ import (
 	"github.com/fabioconcina/arpdvark/mcpserver"
 	"github.com/fabioconcina/arpdvark/output"
 	"github.com/fabioconcina/arpdvark/scanner"
+	"github.com/fabioconcina/arpdvark/state"
 	"github.com/fabioconcina/arpdvark/tags"
 	"github.com/fabioconcina/arpdvark/tui"
 )
@@ -21,6 +22,12 @@ import (
 var version = "dev"
 
 func main() {
+	// Handle subcommands before flag.Parse().
+	if len(os.Args) >= 2 && os.Args[1] == "forget" {
+		runForget(os.Args[2:])
+		return
+	}
+
 	var (
 		ifaceName   string
 		interval    int
@@ -29,6 +36,7 @@ func main() {
 		jsonOutput  bool
 		onceOutput  bool
 		mcpMode     bool
+		allDevices  bool
 	)
 
 	flag.StringVar(&ifaceName, "i", "", "Network interface to scan (default: auto-detect)")
@@ -38,8 +46,9 @@ func main() {
 	flag.BoolVar(&jsonOutput, "json", false, "Run one scan and output JSON to stdout")
 	flag.BoolVar(&onceOutput, "once", false, "Run one scan and print a table to stdout")
 	flag.BoolVar(&mcpMode, "mcp", false, "Run as MCP server (stdio transport)")
+	flag.BoolVar(&allDevices, "all", false, "Include offline devices (--json and --once only)")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: arpdvark [options]\n\nOptions:\n")
+		fmt.Fprintf(os.Stderr, "Usage: arpdvark [options]\n       arpdvark forget [--older-than N] [MAC ...]\n\nOptions:\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -97,6 +106,12 @@ func main() {
 		store = tags.Empty()
 	}
 
+	stateStore, err := state.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not load state file: %v\n", err)
+		stateStore = state.Empty()
+	}
+
 	// Single-shot modes: scan once and exit.
 	if jsonOutput || onceOutput {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -106,29 +121,95 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(exitcode.GeneralError)
 		}
-		if len(devices) == 0 {
-			if jsonOutput {
-				fmt.Println("[]")
-			}
-			os.Exit(exitcode.NoDevices)
-		}
+
 		allTags := store.All()
-		if jsonOutput {
-			if err := output.WriteJSON(os.Stdout, devices, allTags); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+
+		if allDevices {
+			allDevs, mergeErr := stateStore.Merge(devices)
+			if mergeErr != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", mergeErr)
 				os.Exit(exitcode.GeneralError)
 			}
+			if len(allDevs) == 0 {
+				if jsonOutput {
+					fmt.Println("[]")
+				}
+				os.Exit(exitcode.NoDevices)
+			}
+			if jsonOutput {
+				if err := output.WriteJSONFromState(os.Stdout, allDevs, allTags); err != nil {
+					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					os.Exit(exitcode.GeneralError)
+				}
+			} else {
+				output.WriteTableFromState(os.Stdout, allDevs, allTags)
+			}
 		} else {
-			output.WriteTable(os.Stdout, devices, allTags)
+			// Still merge to update state file, but only display online devices.
+			stateStore.Merge(devices)
+			if len(devices) == 0 {
+				if jsonOutput {
+					fmt.Println("[]")
+				}
+				os.Exit(exitcode.NoDevices)
+			}
+			if jsonOutput {
+				if err := output.WriteJSON(os.Stdout, devices, allTags); err != nil {
+					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					os.Exit(exitcode.GeneralError)
+				}
+			} else {
+				output.WriteTable(os.Stdout, devices, allTags)
+			}
 		}
 		return
 	}
 
 	// Default: interactive TUI.
-	m := tui.New(sc, store, time.Duration(interval)*time.Second, version)
+	m := tui.New(sc, store, stateStore, time.Duration(interval)*time.Second, version)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(exitcode.GeneralError)
+	}
+}
+
+func runForget(args []string) {
+	fs := flag.NewFlagSet("forget", flag.ExitOnError)
+	olderThan := fs.Int("older-than", 0, "Remove devices not seen in N days")
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: arpdvark forget [--older-than N] [MAC ...]\n\nOptions:\n")
+		fs.PrintDefaults()
+	}
+	fs.Parse(args)
+
+	stateStore, err := state.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(exitcode.GeneralError)
+	}
+
+	if *olderThan > 0 {
+		cutoff := time.Now().AddDate(0, 0, -*olderThan)
+		n, err := stateStore.ForgetOlderThan(cutoff)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(exitcode.GeneralError)
+		}
+		fmt.Printf("Removed %d device(s)\n", n)
+		return
+	}
+
+	macs := fs.Args()
+	if len(macs) == 0 {
+		fs.Usage()
+		os.Exit(exitcode.GeneralError)
+	}
+	for _, mac := range macs {
+		if err := stateStore.Forget(mac); err != nil {
+			fmt.Fprintf(os.Stderr, "Error removing %s: %v\n", mac, err)
+			os.Exit(exitcode.GeneralError)
+		}
+		fmt.Printf("Removed %s\n", mac)
 	}
 }

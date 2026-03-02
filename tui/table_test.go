@@ -3,11 +3,10 @@
 package tui
 
 import (
-	"net"
 	"testing"
 	"time"
 
-	"github.com/fabioconcina/arpdvark/scanner"
+	"github.com/fabioconcina/arpdvark/state"
 )
 
 func TestHumanDuration(t *testing.T) {
@@ -32,18 +31,20 @@ func TestHumanDuration(t *testing.T) {
 }
 
 func TestDevicesToRows(t *testing.T) {
-	devices := []scanner.Device{
+	devices := []state.Device{
 		{
-			IP:       net.ParseIP("192.168.1.1").To4(),
-			MAC:      net.HardwareAddr{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF},
+			IP:       "192.168.1.1",
+			MAC:      "aa:bb:cc:dd:ee:ff",
 			Hostname: "router.home",
 			Vendor:   "Acme Corp",
+			Online:   true,
 		},
 		{
-			IP:       net.ParseIP("192.168.1.2").To4(),
-			MAC:      net.HardwareAddr{0x11, 0x22, 0x33, 0x44, 0x55, 0x66},
+			IP:       "192.168.1.2",
+			MAC:      "11:22:33:44:55:66",
 			Hostname: "",
 			Vendor:   "Unknown",
+			Online:   true,
 		},
 	}
 	rows := devicesToRows(devices, nil)
@@ -82,9 +83,8 @@ func TestDevicesToRows_Empty(t *testing.T) {
 }
 
 func TestDevicesToRows_WithLabels(t *testing.T) {
-	mac := net.HardwareAddr{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF}
-	devices := []scanner.Device{
-		{IP: net.ParseIP("192.168.1.1").To4(), MAC: mac, Hostname: "router", Vendor: "Acme"},
+	devices := []state.Device{
+		{IP: "192.168.1.1", MAC: "aa:bb:cc:dd:ee:ff", Hostname: "router", Vendor: "Acme", Online: true},
 	}
 	labels := map[string]string{"aa:bb:cc:dd:ee:ff": "my-router"}
 	rows := devicesToRows(devices, labels)
@@ -97,11 +97,33 @@ func TestDevicesToRows_WithLabels(t *testing.T) {
 }
 
 func TestDevicesToRows_NoLabel(t *testing.T) {
-	devices := []scanner.Device{
-		{IP: net.ParseIP("192.168.1.2").To4(), MAC: net.HardwareAddr{0x11, 0x22, 0x33, 0x44, 0x55, 0x66}},
+	devices := []state.Device{
+		{IP: "192.168.1.2", MAC: "11:22:33:44:55:66", Online: true},
 	}
 	rows := devicesToRows(devices, nil)
 	if rows[0][3] != "" {
 		t.Errorf("label col = %q, want empty", rows[0][3])
+	}
+}
+
+func TestDevicesToRows_OfflineDimmed(t *testing.T) {
+	devices := []state.Device{
+		{IP: "192.168.1.1", MAC: "aa:bb:cc:dd:ee:ff", Vendor: "Acme", Online: false},
+	}
+	rows := devicesToRows(devices, nil)
+	// Offline rows should contain ANSI escape sequences from the dim style.
+	if rows[0][0] == "192.168.1.1" {
+		t.Error("offline device IP should be styled (contain ANSI escapes)")
+	}
+}
+
+func TestCountOnline(t *testing.T) {
+	devices := []state.Device{
+		{Online: true},
+		{Online: false},
+		{Online: true},
+	}
+	if got := countOnline(devices); got != 2 {
+		t.Errorf("countOnline = %d, want 2", got)
 	}
 }

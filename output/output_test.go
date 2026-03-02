@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fabioconcina/arpdvark/scanner"
+	"github.com/fabioconcina/arpdvark/state"
 )
 
 var testTime = time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC)
@@ -132,5 +133,102 @@ func TestWriteTable_Empty(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
 	if len(lines) != 1 {
 		t.Errorf("got %d lines, want 1 (header only)", len(lines))
+	}
+}
+
+func testStateDevices() []state.Device {
+	return []state.Device{
+		{
+			MAC:       "aa:bb:cc:dd:ee:ff",
+			IP:        "192.168.1.1",
+			Vendor:    "Cisco Systems",
+			Hostname:  "router.local",
+			FirstSeen: testTime,
+			LastSeen:  testTime,
+			Online:    true,
+		},
+		{
+			MAC:       "11:22:33:44:55:66",
+			IP:        "192.168.1.10",
+			Vendor:    "Unknown",
+			Hostname:  "",
+			FirstSeen: testTime,
+			LastSeen:  testTime,
+			Online:    false,
+		},
+	}
+}
+
+func TestToDeviceJSONFromState(t *testing.T) {
+	tags := map[string]string{"aa:bb:cc:dd:ee:ff": "main-router"}
+	result := ToDeviceJSONFromState(testStateDevices(), tags)
+
+	if len(result) != 2 {
+		t.Fatalf("got %d devices, want 2", len(result))
+	}
+
+	d := result[0]
+	if d.IP != "192.168.1.1" {
+		t.Errorf("IP = %q, want %q", d.IP, "192.168.1.1")
+	}
+	if d.Label != "main-router" {
+		t.Errorf("Label = %q, want %q", d.Label, "main-router")
+	}
+	if d.Online == nil || *d.Online != true {
+		t.Error("Online should be true")
+	}
+
+	if result[1].Online == nil || *result[1].Online != false {
+		t.Error("second device Online should be false")
+	}
+}
+
+func TestWriteJSONFromState(t *testing.T) {
+	tags := map[string]string{"aa:bb:cc:dd:ee:ff": "main-router"}
+	var buf bytes.Buffer
+	if err := WriteJSONFromState(&buf, testStateDevices(), tags); err != nil {
+		t.Fatalf("WriteJSONFromState error: %v", err)
+	}
+
+	var parsed []DeviceJSON
+	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+		t.Fatalf("JSON parse error: %v", err)
+	}
+	if len(parsed) != 2 {
+		t.Fatalf("got %d devices, want 2", len(parsed))
+	}
+	if parsed[0].Online == nil || *parsed[0].Online != true {
+		t.Error("first device should be online")
+	}
+	if parsed[1].Online == nil || *parsed[1].Online != false {
+		t.Error("second device should be offline")
+	}
+}
+
+func TestWriteJSON_OnlineOmitted(t *testing.T) {
+	// Standard WriteJSON should not include the "online" field.
+	var buf bytes.Buffer
+	if err := WriteJSON(&buf, testDevices(), nil); err != nil {
+		t.Fatalf("WriteJSON error: %v", err)
+	}
+	if strings.Contains(buf.String(), "online") {
+		t.Error("standard WriteJSON should not include 'online' field")
+	}
+}
+
+func TestWriteTableFromState(t *testing.T) {
+	tags := map[string]string{"aa:bb:cc:dd:ee:ff": "main-router"}
+	var buf bytes.Buffer
+	WriteTableFromState(&buf, testStateDevices(), tags)
+	out := buf.String()
+
+	if !strings.Contains(out, "STATUS") {
+		t.Errorf("missing STATUS header in:\n%s", out)
+	}
+	if !strings.Contains(out, "online") {
+		t.Errorf("missing 'online' status in:\n%s", out)
+	}
+	if !strings.Contains(out, "offline") {
+		t.Errorf("missing 'offline' status in:\n%s", out)
 	}
 }

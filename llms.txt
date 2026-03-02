@@ -38,6 +38,8 @@ Output format:
       }
     ]
 
+With --all, includes an "online" field (true/false) for each device.
+
 ### Human-readable table (--once)
 
     sudo arpdvark --once [-i <interface>] [--large]
@@ -80,8 +82,14 @@ Claude Desktop configuration example:
     --large         Allow subnets larger than /16
     --json          Single scan, JSON output, exit
     --once          Single scan, text table output, exit
+    --all           Include offline devices (--json and --once only)
     --mcp           Run as MCP server (stdio)
     --version       Print version and exit
+
+## Subcommands
+
+    arpdvark forget [MAC ...]           Remove specific devices from state
+    arpdvark forget --older-than N      Remove devices not seen in N days
 
 ## Permissions
 
@@ -101,3 +109,16 @@ Uses raw ARP sockets (AF_PACKET). Requires sudo or CAP_NET_RAW:
 
 Devices can be labeled by MAC address. Labels persist in ~/.config/arpdvark/tags.json
 and are included in all output modes (TUI, JSON, table, MCP).
+
+## Device persistence
+
+Scan results are saved to ~/.config/arpdvark/state.json across runs. Each device is
+keyed by MAC address and tracks IP, vendor, hostname, first_seen, and last_seen.
+
+In the TUI, previously known devices appear immediately on startup (dimmed as offline)
+before the first scan completes. Press `o` to toggle showing offline devices.
+
+With --json --all or --once --all, offline devices are included in the output with an
+"online" field (true/false for JSON, STATUS column for text table).
+
+Use `arpdvark forget` to remove devices from the state file.

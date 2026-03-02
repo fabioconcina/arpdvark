@@ -37,6 +37,7 @@ A minimal, fast terminal-based network inventory tool. Scans your local network 
 - **Locally administered MAC detection** — flags randomized, VM-assigned, or manually set MACs as `Local/Randomized` (these have no OUI entry by design)
 - **Full-screen TUI** — fills the terminal, resizes dynamically, auto-refreshes on a configurable interval
 - **Persistent device table** — devices seen in previous scans remain visible; `LastSeen`, MAC, and vendor are updated on each round
+- **Device persistence** — scan results are saved to `~/.config/arpdvark/state.json` across runs, tracking first-seen/last-seen timestamps and online/offline status; the TUI shows previously known devices immediately on startup
 - **Host labels** — assign custom names to any device; labels are keyed by MAC address and persist across restarts in `~/.config/arpdvark/tags.json`
 - **Multi-round first scan** — the first ARP sweep sends 3 rounds of requests (100 ms apart) to catch slow responders such as Wi-Fi clients in power-save mode; subsequent scans send a single round since the device table accumulates across sweeps
 - **Rate-limited scanning** — ARP requests are rate-limited (1000 pkt/s for /24 and smaller, 5000 pkt/s for larger subnets) to avoid overwhelming switches or triggering IDS alerts
@@ -57,6 +58,7 @@ Copy the appropriate binary to your Linux machine and place it in your `PATH`.
 
 ```
 Usage: arpdvark [options]
+       arpdvark forget [--older-than N] [MAC ...]
 
 Options:
   -i <interface>    Network interface to scan (default: auto-detect)
@@ -64,6 +66,7 @@ Options:
   --large           Allow scanning subnets larger than /16
   --json            Run one scan and output JSON to stdout
   --once            Run one scan and print a plain-text table to stdout
+  --all             Include offline devices (--json and --once only)
   --mcp             Run as MCP server (stdio transport)
   --version         Print version and exit
   -h                Show help
@@ -90,6 +93,7 @@ sudo arpdvark -i eth0 --large
 | `r` | Force immediate rescan |
 | `↑` / `↓` | Navigate table rows |
 | `e` | Edit label for selected row |
+| `o` | Toggle show/hide offline devices |
 | `Enter` | Save label (empty to clear) |
 | `Esc` | Cancel label edit |
 
@@ -115,6 +119,14 @@ Runs a single scan, prints a JSON array to stdout, and exits. Suitable for pipin
   }
 ]
 ```
+
+Use `--all` to include offline (previously seen) devices:
+
+```sh
+sudo arpdvark --json --all
+```
+
+With `--all`, each device includes an `"online"` field (`true`/`false`).
 
 ### Plain-text table (`--once`)
 
@@ -143,6 +155,15 @@ Runs an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server o
     }
   }
 }
+```
+
+### Forget devices
+
+Remove specific devices from the state file, or prune devices not seen in a given number of days:
+
+```sh
+arpdvark forget aa:bb:cc:dd:ee:ff           # remove one device by MAC
+arpdvark forget --older-than 30             # remove devices unseen for 30+ days
 ```
 
 ### Exit codes

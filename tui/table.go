@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/fabioconcina/arpdvark/scanner"
+	"github.com/fabioconcina/arpdvark/state"
 )
 
 const (
@@ -47,6 +47,8 @@ var (
 			Padding(0, 1)
 
 	styleErr = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+
+	styleDim = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 )
 
 // newTable creates a configured bubbles table model with default dimensions.
@@ -95,22 +97,25 @@ func applySize(m M) M {
 		tableHeight = 1
 	}
 	m.tbl.SetHeight(tableHeight)
-	m.tbl.SetRows(devicesToRows(m.devices, m.tags))
+	m.tbl.SetRows(devicesToRows(m.displayDevices(), m.tags))
 	return m
 }
 
-// devicesToRows converts scanner devices to table rows.
+// devicesToRows converts state devices to table rows.
+// Offline devices are rendered with dim styling.
 // tags is a mac→label map; nil is treated as empty.
-func devicesToRows(devices []scanner.Device, tags map[string]string) []table.Row {
+func devicesToRows(devices []state.Device, tags map[string]string) []table.Row {
 	rows := make([]table.Row, len(devices))
 	for i, d := range devices {
-		rows[i] = table.Row{
-			d.IP.String(),
-			d.MAC.String(),
-			d.Hostname,
-			tags[d.MAC.String()],
-			d.Vendor,
+		ip, mac, hostname, label, vendor := d.IP, d.MAC, d.Hostname, tags[d.MAC], d.Vendor
+		if !d.Online {
+			ip = styleDim.Render(ip)
+			mac = styleDim.Render(mac)
+			hostname = styleDim.Render(hostname)
+			label = styleDim.Render(label)
+			vendor = styleDim.Render(vendor)
 		}
+		rows[i] = table.Row{ip, mac, hostname, label, vendor}
 	}
 	return rows
 }
@@ -128,7 +133,14 @@ func renderView(m M) string {
 		statusLine = styleStatus.Render("Label for "+m.editMAC+":") + " " + m.editInput.View()
 	} else {
 		var statusParts []string
-		statusParts = append(statusParts, fmt.Sprintf("%d device(s)", len(m.devices)))
+
+		online := countOnline(m.allDevices)
+		offline := len(m.allDevices) - online
+		if offline > 0 {
+			statusParts = append(statusParts, fmt.Sprintf("%d online, %d offline", online, offline))
+		} else {
+			statusParts = append(statusParts, fmt.Sprintf("%d device(s)", online))
+		}
 
 		if m.scanning {
 			statusParts = append(statusParts, styleScanning.Render("scanning…"))
@@ -140,7 +152,7 @@ func renderView(m M) string {
 			statusParts = append(statusParts, styleErr.Render("error: "+m.err.Error()))
 		}
 
-		statusParts = append(statusParts, "e: label  r: rescan  q: quit")
+		statusParts = append(statusParts, "e: label  o: offline  r: rescan  q: quit")
 		statusLine = styleStatus.Render(strings.Join(statusParts, "  •  "))
 	}
 
@@ -170,6 +182,17 @@ func renderSplash(m M) string {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
 	}
 	return content
+}
+
+// countOnline returns the number of online devices in the list.
+func countOnline(devices []state.Device) int {
+	n := 0
+	for _, d := range devices {
+		if d.Online {
+			n++
+		}
+	}
+	return n
 }
 
 // humanDuration formats a duration as a short human-readable string.

@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/fabioconcina/arpdvark/scanner"
+	"github.com/fabioconcina/arpdvark/state"
 	"github.com/fabioconcina/arpdvark/tags"
 )
 
@@ -53,26 +54,32 @@ type M struct {
 	editing   bool
 	editInput textinput.Model
 	editMAC   string
+
+	stateStore  *state.Store
+	allDevices  []state.Device // all known devices (online + offline)
+	showOffline bool           // toggle: show/hide offline devices
 }
 
 // New creates a new TUI model.
-func New(sc *scanner.Scanner, store *tags.Store, interval time.Duration, version string) M {
+func New(sc *scanner.Scanner, store *tags.Store, stateStore *state.Store, interval time.Duration, version string) M {
 	ti := textinput.New()
 	ti.Placeholder = "enter label (empty to clear)"
 	ti.CharLimit = 64
 	ti.Width = 40
 
 	return M{
-		tbl:       newTable(),
-		iface:     sc.Interface(),
-		subnet:    sc.Subnet(),
-		interval:  interval,
-		sc:        sc,
-		version:   version,
-		splash:    true,
-		tagStore:  store,
-		tags:      store.All(),
-		editInput: ti,
+		tbl:        newTable(),
+		iface:      sc.Interface(),
+		subnet:     sc.Subnet(),
+		interval:   interval,
+		sc:         sc,
+		version:    version,
+		splash:     true,
+		tagStore:   store,
+		tags:       store.All(),
+		editInput:  ti,
+		stateStore: stateStore,
+		allDevices: stateStore.All(),
 	}
 }
 
@@ -130,8 +137,13 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, scanCmd(m.sc)
 			}
 
+		case "o":
+			m.showOffline = !m.showOffline
+			m.tbl.SetRows(devicesToRows(m.displayDevices(), m.tags))
+			return m, nil
+
 		case "e":
-			if len(m.devices) == 0 {
+			if len(m.displayDevices()) == 0 {
 				return m, nil
 			}
 			sel := m.tbl.SelectedRow()
@@ -160,7 +172,7 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.tags[msg.mac] = msg.label
 			}
-			m.tbl.SetRows(devicesToRows(m.devices, m.tags))
+			m.tbl.SetRows(devicesToRows(m.displayDevices(), m.tags))
 		}
 		m.editing = false
 		m.editInput.Blur()
@@ -174,7 +186,13 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.err = nil
 			m.devices = msg.Devices
-			m.tbl.SetRows(devicesToRows(m.devices, m.tags))
+			allDevs, err := m.stateStore.Merge(msg.Devices)
+			if err != nil {
+				m.err = err
+			} else {
+				m.allDevices = allDevs
+			}
+			m.tbl.SetRows(devicesToRows(m.displayDevices(), m.tags))
 		}
 		return m, tea.Tick(m.interval, func(t time.Time) tea.Msg {
 			return TickMsg(t)
@@ -196,6 +214,20 @@ func (m M) View() string {
 		return renderSplash(m)
 	}
 	return renderView(m)
+}
+
+// displayDevices returns the device list to show based on the showOffline toggle.
+func (m M) displayDevices() []state.Device {
+	if m.showOffline {
+		return m.allDevices
+	}
+	online := make([]state.Device, 0, len(m.allDevices))
+	for _, d := range m.allDevices {
+		if d.Online {
+			online = append(online, d)
+		}
+	}
+	return online
 }
 
 // scanCmd returns a Cmd that runs a scan in the background and sends ScanCompleteMsg.
