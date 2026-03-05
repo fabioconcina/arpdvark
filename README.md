@@ -15,16 +15,16 @@
 A minimal, fast terminal-based network inventory tool. Scans your local network using ARP, identifies connected devices, resolves hostnames and MAC vendors, and displays results in a full-screen auto-refreshing TUI.
 
 ```
-╭──────────────────────────────────────────────────────────────────────────────────────────╮
-│ arpdvark  •  interface: eth0  •  subnet: 192.168.1.0/24                                  │
-│ IP Address       MAC Address           Hostname                    Label    Vendor        │
-│ 192.168.1.1      30:1f:48:10:f3:04     router.home                router   zte corp.     │
-│ 192.168.1.2      a8:1d:16:31:a6:4f     laptop.home                         AzureWave     │
-│ 192.168.1.5      98:e2:55:7f:8a:48                                switch   Nintendo       │
-│ 192.168.1.112    34:af:b3:82:16:95     echo.home                  echo     Amazon Tech.  │
-│ 192.168.1.136    ea:03:65:53:c9:62                                         Local/Random. │
-│ 5 device(s)  •  last scan: 2s ago  •  e: label  r: rescan  q: quit                       │
-╰──────────────────────────────────────────────────────────────────────────────────────────╯
+arpdvark  •  interface: eth0  •  subnet: 192.168.1.0/24
+
+IP Address       MAC Address         Hostname        Label     Vendor
+192.168.1.1      30:1f:48:10:f3:04   router.home     router    zte corp.
+192.168.1.2      a8:1d:16:31:a6:4f   laptop.home               AzureWave
+192.168.1.5      98:e2:55:7f:8a:48                   switch    Nintendo
+192.168.1.112    34:af:b3:82:16:95   echo.home       echo      Amazon Tech.
+192.168.1.136    ea:03:65:53:c9:62                              Local/Random.
+
+5 device(s)  •  last scan: 2s ago  •  e: label  r: rescan  q: quit
 ```
 
 **Supported platforms:** Linux (amd64, arm64)
