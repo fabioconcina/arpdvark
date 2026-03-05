@@ -152,11 +152,64 @@ func renderView(m M) string {
 			statusParts = append(statusParts, styleErr.Render("error: "+m.err.Error()))
 		}
 
-		statusParts = append(statusParts, "e: label  o: offline  r: rescan  q: quit")
+		statusParts = append(statusParts, "↵: details  e: label  o: offline  r: rescan  q: quit")
 		statusLine = styleStatus.Render(strings.Join(statusParts, "  •  "))
 	}
 
 	body := strings.Join([]string{title, tableStr, statusLine}, "\n")
+	bs := styleBorder
+	if m.width > 0 {
+		bs = bs.Width(m.width - 2)
+	}
+	return bs.Render(body)
+}
+
+// detailFieldCount is the number of fields shown in the detail view.
+const detailFieldCount = 8
+
+// renderDetail renders the device detail panel.
+func renderDetail(m M) string {
+	d := m.detailDevice
+	title := styleTitle.Render("device detail") + "  —  " + d.IP
+
+	label := m.tags[d.MAC]
+	if label == "" {
+		label = "-"
+	}
+	status := "offline"
+	if d.Online {
+		status = "online"
+	}
+
+	fields := [detailFieldCount][2]string{
+		{"IP Address", d.IP},
+		{"MAC Address", d.MAC},
+		{"Hostname", d.Hostname},
+		{"Label", label},
+		{"Vendor", d.Vendor},
+		{"Status", status},
+		{"First Seen", d.FirstSeen.Format("2006-01-02 15:04")},
+		{"Last Seen", d.LastSeen.Format("2006-01-02 15:04")},
+	}
+
+	styleFieldName := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("243")).
+		Width(12)
+	styleFieldValue := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252"))
+
+	var rows []string
+	for i, f := range fields {
+		row := styleFieldName.Render(f[0]) + "  " + styleFieldValue.Render(f[1])
+		if i == m.detailCursor {
+			row = styleSelected.Render(fmt.Sprintf("%-12s  %s", f[0], f[1]))
+		}
+		rows = append(rows, row)
+	}
+
+	statusLine := styleStatus.Render("↑↓: navigate  esc / ↵: back")
+
+	body := title + "\n\n" + strings.Join(rows, "\n") + "\n\n" + statusLine
 	bs := styleBorder
 	if m.width > 0 {
 		bs = bs.Width(m.width - 2)

@@ -16,7 +16,10 @@ Requires Linux and root/CAP_NET_RAW. Install from source:
 
     sudo arpdvark [-i <interface>] [-t <seconds>] [--large]
 
-Full-screen terminal UI with auto-refresh, keyboard navigation, and label editing.
+Full-screen terminal UI with auto-refresh, keyboard navigation, label editing, and device detail view.
+
+Key bindings: q/ctrl+c quit; r rescan; up/down navigate; e edit label; o toggle offline; Enter open detail view.
+Detail view: shows all fields untruncated (IP, MAC, hostname, label, vendor, status, first/last seen); up/down to navigate.
 
 ### JSON output (--json)
 

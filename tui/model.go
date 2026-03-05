@@ -58,6 +58,10 @@ type M struct {
 	stateStore  *state.Store
 	allDevices  []state.Device // all known devices (online + offline)
 	showOffline bool           // toggle: show/hide offline devices
+
+	detailView   bool
+	detailDevice state.Device
+	detailCursor int // selected field index in detail view
 }
 
 // New creates a new TUI model.
@@ -127,9 +131,40 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		if m.detailView {
+			switch msg.String() {
+			case "esc", "enter":
+				m.detailView = false
+				return m, nil
+			case "up", "k":
+				if m.detailCursor > 0 {
+					m.detailCursor--
+				}
+				return m, nil
+			case "down", "j":
+				if m.detailCursor < detailFieldCount-1 {
+					m.detailCursor++
+				}
+				return m, nil
+			case "q", "ctrl+c":
+				return m, tea.Quit
+			}
+			return m, nil
+		}
+
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+
+		case "enter":
+			devices := m.displayDevices()
+			if len(devices) == 0 {
+				return m, nil
+			}
+			m.detailDevice = devices[m.tbl.Cursor()]
+			m.detailCursor = 0
+			m.detailView = true
+			return m, nil
 
 		case "r":
 			if !m.scanning {
@@ -203,6 +238,7 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.scanning = true
 			return m, scanCmd(m.sc)
 		}
+
 	}
 
 	return m, nil
@@ -212,6 +248,9 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m M) View() string {
 	if m.splash {
 		return renderSplash(m)
+	}
+	if m.detailView {
+		return renderDetail(m)
 	}
 	return renderView(m)
 }

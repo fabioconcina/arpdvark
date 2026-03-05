@@ -94,8 +94,10 @@ sudo arpdvark -i eth0 --large
 | `↑` / `↓` | Navigate table rows |
 | `e` | Edit label for selected row |
 | `o` | Toggle show/hide offline devices |
-| `Enter` | Save label (empty to clear) |
-| `Esc` | Cancel label edit |
+| `Enter` | Open device detail view |
+| `Esc` / `Enter` | Close detail view / cancel label edit |
+
+**Detail view** (`Enter` on a row): shows all device fields untruncated — IP, MAC, hostname, label, vendor, status, first seen, last seen. Navigate fields with `↑`/`↓`.
 
 ### JSON output (`--json`)
 
