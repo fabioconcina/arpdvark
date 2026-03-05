@@ -19,7 +19,7 @@ Requires Linux and root/CAP_NET_RAW. Install from source:
 Full-screen terminal UI with auto-refresh, keyboard navigation, label editing, and device detail view.
 
 Key bindings: q/ctrl+c quit; r rescan; up/down navigate; e edit label; left/right cycle sort column; s toggle sort direction; / filter (/ again to clear); o toggle offline; Enter open detail view.
-Detail view: shows all fields untruncated (IP, MAC, hostname, label, vendor, status, first/last seen); up/down to navigate.
+Detail view: shows all fields untruncated (IP, MAC, hostname, label, vendor, status, first/last seen) plus a weekly activity heatmap; up/down to navigate.
 Sorting: left/right arrows cycle through IP, MAC, Hostname, Label, Vendor, Last Seen; s toggles asc/desc.
 Filtering: / opens filter input; matches against all fields; Enter applies, Esc clears filter, / again also clears active filter.
 New device alerts: devices not in state.json from previous runs are highlighted green with a count in the status bar.
@@ -120,6 +120,17 @@ and are included in all output modes (TUI, JSON, table, MCP).
 
 Scan results are saved to ~/.config/arpdvark/state.json across runs. Each device is
 keyed by MAC address and tracks IP, vendor, hostname, first_seen, and last_seen.
+
+## Activity tracking
+
+Every scan mode (TUI, --json, --once) records device sightings in a per-MAC 7x24 matrix
+(weekday x hour) stored in ~/.config/arpdvark/activity.json. Each scan increments the
+count for the current weekday+hour for every online device. The detail view renders this
+as an ASCII heatmap using block characters (space, light, medium, dark, full) normalized
+to the maximum count. For continuous data collection, run periodic scans via cron:
+Add to root's crontab (sudo crontab -e):
+*/5 * * * * /path/to/arpdvark --once > /dev/null 2>&1
+The `forget` subcommand also removes activity data for forgotten devices.
 
 In the TUI, previously known devices appear immediately on startup (dimmed as offline)
 before the first scan completes. Press `o` to toggle showing offline devices.

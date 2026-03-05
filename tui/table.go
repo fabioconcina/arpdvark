@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/fabioconcina/arpdvark/activity"
 	"github.com/fabioconcina/arpdvark/state"
 )
 
@@ -320,9 +321,13 @@ func renderDetail(m M) string {
 		rows = append(rows, row)
 	}
 
+	// Activity heatmap.
+	heatmapStr := "\n" + styleDim.Render("Weekly Activity") + "\n" +
+		styleDim.Render(activity.Heatmap(m.activityStore.Get(d.MAC)))
+
 	statusLine := styleStatus.Render("↑↓: navigate  esc / ↵: back")
 
-	body := title + "\n\n" + strings.Join(rows, "\n") + "\n\n" + statusLine
+	body := title + "\n\n" + strings.Join(rows, "\n") + "\n" + heatmapStr + "\n\n" + statusLine
 	bs := styleBorder
 	if m.width > 0 {
 		bs = bs.Width(m.width - 2)

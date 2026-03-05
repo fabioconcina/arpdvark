@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/fabioconcina/arpdvark/activity"
 	"github.com/fabioconcina/arpdvark/scanner"
 	"github.com/fabioconcina/arpdvark/state"
 	"github.com/fabioconcina/arpdvark/tags"
@@ -85,10 +86,12 @@ type M struct {
 
 	knownMACs map[string]bool // MACs that existed in state before this session
 	newMACs   map[string]bool // MACs discovered for the first time this session
+
+	activityStore *activity.Store
 }
 
 // New creates a new TUI model.
-func New(sc *scanner.Scanner, store *tags.Store, stateStore *state.Store, interval time.Duration, version string) M {
+func New(sc *scanner.Scanner, store *tags.Store, stateStore *state.Store, actStore *activity.Store, interval time.Duration, version string) M {
 	ti := textinput.New()
 	ti.Placeholder = "enter label (empty to clear)"
 	ti.CharLimit = 64
@@ -119,9 +122,10 @@ func New(sc *scanner.Scanner, store *tags.Store, stateStore *state.Store, interv
 		filterInput: fi,
 		stateStore:  stateStore,
 		allDevices:  stateStore.All(),
-		sortAsc:   true,
-		knownMACs: knownMACs,
-		newMACs:   make(map[string]bool),
+		sortAsc:       true,
+		knownMACs:     knownMACs,
+		newMACs:       make(map[string]bool),
+		activityStore: actStore,
 	}
 }
 
@@ -207,6 +211,7 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			case "q", "ctrl+c":
+				m.activityStore.Save()
 				return m, tea.Quit
 			}
 			return m, nil
@@ -214,6 +219,7 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch msg.String() {
 		case "q", "ctrl+c":
+			m.activityStore.Save()
 			return m, tea.Quit
 
 		case "esc":
@@ -331,6 +337,13 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.newMACs[mac] = true
 				}
 			}
+			// Record activity for online devices.
+			onlineMACs := make([]string, len(msg.Devices))
+			for i, d := range msg.Devices {
+				onlineMACs[i] = d.MAC.String()
+			}
+			m.activityStore.Record(onlineMACs, time.Now())
+
 			allDevs, err := m.stateStore.Merge(msg.Devices)
 			if err != nil {
 				m.err = err

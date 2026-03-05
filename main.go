@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/fabioconcina/arpdvark/activity"
 	"github.com/fabioconcina/arpdvark/exitcode"
 	"github.com/fabioconcina/arpdvark/mcpserver"
 	"github.com/fabioconcina/arpdvark/output"
@@ -112,6 +113,12 @@ func main() {
 		stateStore = state.Empty()
 	}
 
+	actStore, err := activity.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not load activity file: %v\n", err)
+		actStore = activity.Empty()
+	}
+
 	// Single-shot modes: scan once and exit.
 	if jsonOutput || onceOutput {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -121,6 +128,14 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(exitcode.GeneralError)
 		}
+
+		// Record activity for discovered devices.
+		onlineMACs := make([]string, len(devices))
+		for i, d := range devices {
+			onlineMACs[i] = d.MAC.String()
+		}
+		actStore.Record(onlineMACs, time.Now())
+		actStore.Save()
 
 		allTags := store.All()
 
@@ -166,7 +181,7 @@ func main() {
 	}
 
 	// Default: interactive TUI.
-	m := tui.New(sc, store, stateStore, time.Duration(interval)*time.Second, version)
+	m := tui.New(sc, store, stateStore, actStore, time.Duration(interval)*time.Second, version)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -187,6 +202,12 @@ func runForget(args []string) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(exitcode.GeneralError)
+	}
+
+	actStore, err := activity.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not load activity file: %v\n", err)
+		actStore = activity.Empty()
 	}
 
 	if *olderThan > 0 {
@@ -210,6 +231,8 @@ func runForget(args []string) {
 			fmt.Fprintf(os.Stderr, "Error removing %s: %v\n", mac, err)
 			os.Exit(exitcode.GeneralError)
 		}
+		actStore.Forget(mac)
 		fmt.Printf("Removed %s\n", mac)
 	}
+	actStore.Save()
 }

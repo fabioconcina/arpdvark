@@ -43,6 +43,7 @@ IP Address       MAC Address         Hostname        Label     Vendor
 - **Column sorting** — use `←`/`→` to cycle sort column (IP, MAC, Hostname, Label, Vendor, Last Seen); press `s` to toggle ascending/descending
 - **Device filtering** — press `/` to filter the device table by any field; matches IP, MAC, hostname, label, and vendor; press `/` again to clear
 - **New device alerts** — devices seen for the first time (not in the state file from previous runs) are highlighted in green in the TUI, with a count in the status bar
+- **Activity heatmap** — the detail view shows a weekly activity pattern (7 days x 24 hours) built from scan history, using block characters to visualize when a device is typically connected; activity is recorded in all modes (TUI, `--json`, `--once`) and persisted to `~/.config/arpdvark/activity.json`
 - **Rate-limited scanning** — ARP requests are rate-limited (1000 pkt/s for /24 and smaller, 5000 pkt/s for larger subnets) to avoid overwhelming switches or triggering IDS alerts
 
 ## Installation
@@ -103,7 +104,7 @@ sudo arpdvark -i eth0 --large
 | `Enter` | Open device detail view |
 | `Esc` / `Enter` | Close detail view / close filter / cancel label edit |
 
-**Detail view** (`Enter` on a row): shows all device fields untruncated — IP, MAC, hostname, label, vendor, status, first seen, last seen. Navigate fields with `↑`/`↓`.
+**Detail view** (`Enter` on a row): shows all device fields untruncated — IP, MAC, hostname, label, vendor, status, first seen, last seen — plus a weekly activity heatmap showing when the device is typically online. Navigate fields with `↑`/`↓`.
 
 ### JSON output (`--json`)
 
@@ -173,6 +174,17 @@ Remove specific devices from the state file, or prune devices not seen in a give
 arpdvark forget aa:bb:cc:dd:ee:ff           # remove one device by MAC
 arpdvark forget --older-than 30             # remove devices unseen for 30+ days
 ```
+
+### Activity tracking
+
+Every scan (TUI, `--json`, `--once`) records which devices are online, building a weekly activity heatmap visible in the detail view (`Enter` on a device). To get useful data, run periodic scans in the background with a cron job:
+
+```sh
+# Add to root's crontab (sudo crontab -e):
+*/5 * * * * /path/to/arpdvark --once > /dev/null 2>&1
+```
+
+Activity data is stored in `~/.config/arpdvark/activity.json`. The `forget` subcommand also removes activity data for forgotten devices.
 
 ### Exit codes
 
