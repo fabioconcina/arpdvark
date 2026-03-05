@@ -55,7 +55,7 @@ func TestDevicesToRows(t *testing.T) {
 			Online:   true,
 		},
 	}
-	rows := devicesToRows(devices, nil)
+	rows := devicesToRows(devices, nil, nil)
 	if len(rows) != 2 {
 		t.Fatalf("devicesToRows() = %d rows, want 2", len(rows))
 	}
@@ -84,7 +84,7 @@ func TestDevicesToRows(t *testing.T) {
 }
 
 func TestDevicesToRows_Empty(t *testing.T) {
-	rows := devicesToRows(nil, nil)
+	rows := devicesToRows(nil, nil, nil)
 	if len(rows) != 0 {
 		t.Errorf("devicesToRows(nil) = %d rows, want 0", len(rows))
 	}
@@ -95,7 +95,7 @@ func TestDevicesToRows_WithLabels(t *testing.T) {
 		{IP: "192.168.1.1", MAC: "aa:bb:cc:dd:ee:ff", Hostname: "router", Vendor: "Acme", Online: true},
 	}
 	labels := map[string]string{"aa:bb:cc:dd:ee:ff": "my-router"}
-	rows := devicesToRows(devices, labels)
+	rows := devicesToRows(devices, labels, nil)
 	if rows[0][3] != "my-router" {
 		t.Errorf("label col = %q, want %q", rows[0][3], "my-router")
 	}
@@ -108,7 +108,7 @@ func TestDevicesToRows_NoLabel(t *testing.T) {
 	devices := []state.Device{
 		{IP: "192.168.1.2", MAC: "11:22:33:44:55:66", Online: true},
 	}
-	rows := devicesToRows(devices, nil)
+	rows := devicesToRows(devices, nil, nil)
 	if rows[0][3] != "" {
 		t.Errorf("label col = %q, want empty", rows[0][3])
 	}
@@ -118,10 +118,89 @@ func TestDevicesToRows_OfflineDimmed(t *testing.T) {
 	devices := []state.Device{
 		{IP: "192.168.1.1", MAC: "aa:bb:cc:dd:ee:ff", Vendor: "Acme", Online: false},
 	}
-	rows := devicesToRows(devices, nil)
+	rows := devicesToRows(devices, nil, nil)
 	// Offline rows should contain ANSI escape sequences from the dim style.
 	if rows[0][0] == "192.168.1.1" {
 		t.Error("offline device IP should be styled (contain ANSI escapes)")
+	}
+}
+
+func TestDevicesToRows_NewDeviceStyled(t *testing.T) {
+	devices := []state.Device{
+		{IP: "192.168.1.1", MAC: "aa:bb:cc:dd:ee:ff", Vendor: "Acme", Online: true},
+		{IP: "192.168.1.2", MAC: "11:22:33:44:55:66", Vendor: "Other", Online: true},
+	}
+	newMACs := map[string]bool{"aa:bb:cc:dd:ee:ff": true}
+	rows := devicesToRows(devices, nil, newMACs)
+	// New device rows should contain ANSI escape sequences from the new style.
+	if rows[0][0] == "192.168.1.1" {
+		t.Error("new device IP should be styled (contain ANSI escapes)")
+	}
+	// Non-new device should be plain.
+	if rows[1][0] != "192.168.1.2" {
+		t.Errorf("non-new device IP = %q, want plain %q", rows[1][0], "192.168.1.2")
+	}
+}
+
+func TestSortDevices_IP(t *testing.T) {
+	devices := []state.Device{
+		{IP: "192.168.1.10", MAC: "aa:bb:cc:dd:ee:ff"},
+		{IP: "192.168.1.2", MAC: "11:22:33:44:55:66"},
+		{IP: "192.168.1.1", MAC: "00:11:22:33:44:55"},
+	}
+	sortDevices(devices, SortIP, true, nil)
+	if devices[0].IP != "192.168.1.1" || devices[1].IP != "192.168.1.2" || devices[2].IP != "192.168.1.10" {
+		t.Errorf("sort by IP asc: got %s, %s, %s", devices[0].IP, devices[1].IP, devices[2].IP)
+	}
+	sortDevices(devices, SortIP, false, nil)
+	if devices[0].IP != "192.168.1.10" {
+		t.Errorf("sort by IP desc: first = %s, want 192.168.1.10", devices[0].IP)
+	}
+}
+
+func TestSortDevices_Hostname(t *testing.T) {
+	devices := []state.Device{
+		{IP: "192.168.1.1", Hostname: "charlie"},
+		{IP: "192.168.1.2", Hostname: "alpha"},
+		{IP: "192.168.1.3", Hostname: "bravo"},
+	}
+	sortDevices(devices, SortHostname, true, nil)
+	if devices[0].Hostname != "alpha" || devices[1].Hostname != "bravo" || devices[2].Hostname != "charlie" {
+		t.Errorf("sort by hostname asc: got %s, %s, %s", devices[0].Hostname, devices[1].Hostname, devices[2].Hostname)
+	}
+}
+
+func TestSortDevices_Label(t *testing.T) {
+	devices := []state.Device{
+		{IP: "192.168.1.1", MAC: "aa:bb:cc:dd:ee:ff"},
+		{IP: "192.168.1.2", MAC: "11:22:33:44:55:66"},
+	}
+	tags := map[string]string{
+		"aa:bb:cc:dd:ee:ff": "zebra",
+		"11:22:33:44:55:66": "apple",
+	}
+	sortDevices(devices, SortLabel, true, tags)
+	if devices[0].MAC != "11:22:33:44:55:66" {
+		t.Errorf("sort by label asc: first MAC = %s, want 11:22:33:44:55:66", devices[0].MAC)
+	}
+}
+
+func TestSortColumnName(t *testing.T) {
+	tests := []struct {
+		col  SortColumn
+		want string
+	}{
+		{SortIP, "IP"},
+		{SortMAC, "MAC"},
+		{SortHostname, "Hostname"},
+		{SortLabel, "Label"},
+		{SortVendor, "Vendor"},
+		{SortLastSeen, "Last Seen"},
+	}
+	for _, tt := range tests {
+		if got := sortColumnName(tt.col); got != tt.want {
+			t.Errorf("sortColumnName(%d) = %q, want %q", tt.col, got, tt.want)
+		}
 	}
 }
 

@@ -18,8 +18,11 @@ Requires Linux and root/CAP_NET_RAW. Install from source:
 
 Full-screen terminal UI with auto-refresh, keyboard navigation, label editing, and device detail view.
 
-Key bindings: q/ctrl+c quit; r rescan; up/down navigate; e edit label; o toggle offline; Enter open detail view.
+Key bindings: q/ctrl+c quit; r rescan; up/down navigate; e edit label; left/right cycle sort column; s toggle sort direction; / filter (/ again to clear); o toggle offline; Enter open detail view.
 Detail view: shows all fields untruncated (IP, MAC, hostname, label, vendor, status, first/last seen); up/down to navigate.
+Sorting: left/right arrows cycle through IP, MAC, Hostname, Label, Vendor, Last Seen; s toggles asc/desc.
+Filtering: / opens filter input; matches against all fields; Enter applies, Esc clears filter, / again also clears active filter.
+New device alerts: devices not in state.json from previous runs are highlighted green with a count in the status bar.
 
 ### JSON output (--json)
 

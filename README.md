@@ -40,6 +40,9 @@ IP Address       MAC Address         Hostname        Label     Vendor
 - **Device persistence** — scan results are saved to `~/.config/arpdvark/state.json` across runs, tracking first-seen/last-seen timestamps and online/offline status; the TUI shows previously known devices immediately on startup
 - **Host labels** — assign custom names to any device; labels are keyed by MAC address and persist across restarts in `~/.config/arpdvark/tags.json`
 - **Multi-round first scan** — the first ARP sweep sends 3 rounds of requests (100 ms apart) to catch slow responders such as Wi-Fi clients in power-save mode; subsequent scans send a single round since the device table accumulates across sweeps
+- **Column sorting** — use `←`/`→` to cycle sort column (IP, MAC, Hostname, Label, Vendor, Last Seen); press `s` to toggle ascending/descending
+- **Device filtering** — press `/` to filter the device table by any field; matches IP, MAC, hostname, label, and vendor; press `/` again to clear
+- **New device alerts** — devices seen for the first time (not in the state file from previous runs) are highlighted in green in the TUI, with a count in the status bar
 - **Rate-limited scanning** — ARP requests are rate-limited (1000 pkt/s for /24 and smaller, 5000 pkt/s for larger subnets) to avoid overwhelming switches or triggering IDS alerts
 
 ## Installation
@@ -93,9 +96,12 @@ sudo arpdvark -i eth0 --large
 | `r` | Force immediate rescan |
 | `↑` / `↓` | Navigate table rows |
 | `e` | Edit label for selected row |
+| `←` / `→` | Cycle sort column (IP, MAC, Hostname, Label, Vendor, Last Seen) |
+| `s` | Toggle sort direction (ascending / descending) |
+| `/` | Open filter (Enter to apply, Esc to clear, `/` again to clear) |
 | `o` | Toggle show/hide offline devices |
 | `Enter` | Open device detail view |
-| `Esc` / `Enter` | Close detail view / cancel label edit |
+| `Esc` / `Enter` | Close detail view / close filter / cancel label edit |
 
 **Detail view** (`Enter` on a row): shows all device fields untruncated — IP, MAC, hostname, label, vendor, status, first seen, last seen. Navigate fields with `↑`/`↓`.
 

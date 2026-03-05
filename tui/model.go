@@ -33,6 +33,19 @@ type labelSavedMsg struct {
 	err   error
 }
 
+// SortColumn identifies which column to sort by.
+type SortColumn int
+
+const (
+	SortIP SortColumn = iota
+	SortMAC
+	SortHostname
+	SortLabel
+	SortVendor
+	SortLastSeen
+	sortColumnCount // sentinel for wrapping
+)
+
 // M is the Bubbletea model for arpdvark.
 type M struct {
 	tbl      table.Model
@@ -62,6 +75,16 @@ type M struct {
 	detailView   bool
 	detailDevice state.Device
 	detailCursor int // selected field index in detail view
+
+	sortCol SortColumn // current sort column
+	sortAsc bool       // sort direction (true = ascending)
+
+	filtering   bool           // whether filter input is active
+	filterInput textinput.Model
+	filterText  string // committed filter string
+
+	knownMACs map[string]bool // MACs that existed in state before this session
+	newMACs   map[string]bool // MACs discovered for the first time this session
 }
 
 // New creates a new TUI model.
@@ -71,19 +94,34 @@ func New(sc *scanner.Scanner, store *tags.Store, stateStore *state.Store, interv
 	ti.CharLimit = 64
 	ti.Width = 40
 
+	fi := textinput.New()
+	fi.Placeholder = "filter..."
+	fi.CharLimit = 64
+	fi.Width = 40
+
+	// Build set of already-known MACs so we can detect new ones.
+	knownMACs := make(map[string]bool)
+	for _, d := range stateStore.All() {
+		knownMACs[d.MAC] = true
+	}
+
 	return M{
-		tbl:        newTable(),
-		iface:      sc.Interface(),
-		subnet:     sc.Subnet(),
-		interval:   interval,
-		sc:         sc,
-		version:    version,
-		splash:     true,
-		tagStore:   store,
-		tags:       store.All(),
-		editInput:  ti,
-		stateStore: stateStore,
-		allDevices: stateStore.All(),
+		tbl:         newTable(),
+		iface:       sc.Interface(),
+		subnet:      sc.Subnet(),
+		interval:    interval,
+		sc:          sc,
+		version:     version,
+		splash:      true,
+		tagStore:    store,
+		tags:        store.All(),
+		editInput:   ti,
+		filterInput: fi,
+		stateStore:  stateStore,
+		allDevices:  stateStore.All(),
+		sortAsc:   true,
+		knownMACs: knownMACs,
+		newMACs:   make(map[string]bool),
 	}
 }
 
@@ -131,6 +169,28 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		if m.filtering {
+			switch msg.String() {
+			case "enter":
+				m.filterText = strings.TrimSpace(m.filterInput.Value())
+				m.filtering = false
+				m.filterInput.Blur()
+				refreshTable(&m)
+				return m, nil
+			case "esc":
+				m.filtering = false
+				m.filterInput.Blur()
+				m.filterText = ""
+				m.filterInput.SetValue("")
+				refreshTable(&m)
+				return m, nil
+			default:
+				var cmd tea.Cmd
+				m.filterInput, cmd = m.filterInput.Update(msg)
+				return m, cmd
+			}
+		}
+
 		if m.detailView {
 			switch msg.String() {
 			case "esc", "enter":
@@ -156,8 +216,16 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 
+		case "esc":
+			if m.filterText != "" {
+				m.filterText = ""
+				m.filterInput.SetValue("")
+				refreshTable(&m)
+				return m, nil
+			}
+
 		case "enter":
-			devices := m.displayDevices()
+			devices := m.filteredDevices()
 			if len(devices) == 0 {
 				return m, nil
 			}
@@ -174,11 +242,46 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "o":
 			m.showOffline = !m.showOffline
-			m.tbl.SetRows(devicesToRows(m.displayDevices(), m.tags))
+			refreshTable(&m)
 			return m, nil
 
+		case "s":
+			m.sortAsc = !m.sortAsc
+			refreshTable(&m)
+			return m, nil
+
+		case "left", "h":
+			if m.sortCol > 0 {
+				m.sortCol--
+			} else {
+				m.sortCol = sortColumnCount - 1
+			}
+			refreshTable(&m)
+			return m, nil
+
+		case "right", "l":
+			m.sortCol++
+			if m.sortCol >= sortColumnCount {
+				m.sortCol = SortIP
+			}
+			refreshTable(&m)
+			return m, nil
+
+		case "/":
+			if m.filterText != "" && !m.filtering {
+				// clear filter if already active
+				m.filterText = ""
+				m.filterInput.SetValue("")
+				refreshTable(&m)
+				return m, nil
+			}
+			m.filterInput.SetValue(m.filterText)
+			m.filterInput.Focus()
+			m.filtering = true
+			return m, textinput.Blink
+
 		case "e":
-			if len(m.displayDevices()) == 0 {
+			if len(m.filteredDevices()) == 0 {
 				return m, nil
 			}
 			sel := m.tbl.SelectedRow()
@@ -207,7 +310,7 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.tags[msg.mac] = msg.label
 			}
-			m.tbl.SetRows(devicesToRows(m.displayDevices(), m.tags))
+			refreshTable(&m)
 		}
 		m.editing = false
 		m.editInput.Blur()
@@ -221,13 +324,20 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.err = nil
 			m.devices = msg.Devices
+			// Detect new devices.
+			for _, d := range msg.Devices {
+				mac := d.MAC.String()
+				if !m.knownMACs[mac] {
+					m.newMACs[mac] = true
+				}
+			}
 			allDevs, err := m.stateStore.Merge(msg.Devices)
 			if err != nil {
 				m.err = err
 			} else {
 				m.allDevices = allDevs
 			}
-			m.tbl.SetRows(devicesToRows(m.displayDevices(), m.tags))
+			refreshTable(&m)
 		}
 		return m, tea.Tick(m.interval, func(t time.Time) tea.Msg {
 			return TickMsg(t)
@@ -255,18 +365,48 @@ func (m M) View() string {
 	return renderView(m)
 }
 
-// displayDevices returns the device list to show based on the showOffline toggle.
+// displayDevices returns the device list based on the showOffline toggle, sorted.
 func (m M) displayDevices() []state.Device {
+	var devices []state.Device
 	if m.showOffline {
-		return m.allDevices
-	}
-	online := make([]state.Device, 0, len(m.allDevices))
-	for _, d := range m.allDevices {
-		if d.Online {
-			online = append(online, d)
+		devices = make([]state.Device, len(m.allDevices))
+		copy(devices, m.allDevices)
+	} else {
+		devices = make([]state.Device, 0, len(m.allDevices))
+		for _, d := range m.allDevices {
+			if d.Online {
+				devices = append(devices, d)
+			}
 		}
 	}
-	return online
+	sortDevices(devices, m.sortCol, m.sortAsc, m.tags)
+	return devices
+}
+
+// filteredDevices returns displayDevices filtered by the current filter text.
+func (m M) filteredDevices() []state.Device {
+	devices := m.displayDevices()
+	if m.filterText == "" {
+		return devices
+	}
+	filter := strings.ToLower(m.filterText)
+	filtered := make([]state.Device, 0, len(devices))
+	for _, d := range devices {
+		if strings.Contains(strings.ToLower(d.IP), filter) ||
+			strings.Contains(strings.ToLower(d.MAC), filter) ||
+			strings.Contains(strings.ToLower(d.Hostname), filter) ||
+			strings.Contains(strings.ToLower(m.tags[d.MAC]), filter) ||
+			strings.Contains(strings.ToLower(d.Vendor), filter) {
+			filtered = append(filtered, d)
+		}
+	}
+	return filtered
+}
+
+// refreshTable updates the table columns (sort indicator) and rows from current state.
+func refreshTable(m *M) {
+	updateColumns(m)
+	m.tbl.SetRows(devicesToRows(m.filteredDevices(), m.tags, m.newMACs))
 }
 
 // scanCmd returns a Cmd that runs a scan in the background and sends ScanCompleteMsg.

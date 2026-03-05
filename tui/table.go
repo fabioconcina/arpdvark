@@ -1,7 +1,10 @@
 package tui
 
 import (
+	"encoding/binary"
 	"fmt"
+	"net"
+	"sort"
 	"strings"
 	"time"
 
@@ -49,17 +52,41 @@ var (
 	styleErr = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 
 	styleDim = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+
+	styleNew = lipgloss.NewStyle().Foreground(lipgloss.Color("82")).Bold(true)
 )
+
+// columnTitles are the base titles for each table column.
+var columnTitles = [5]string{"IP Address", "MAC Address", "Hostname", "Label", "Vendor"}
+
+// columnSortCol maps table column index to SortColumn.
+var columnSortCol = [5]SortColumn{SortIP, SortMAC, SortHostname, SortLabel, SortVendor}
+
+// sortIndicator returns the arrow string for the active sort column.
+func sortIndicator(asc bool) string {
+	if asc {
+		return " ^"
+	}
+	return " v"
+}
+
+// buildColumns returns table columns with a sort indicator on the active column.
+func buildColumns(sortCol SortColumn, sortAsc bool, vendorWidth int) []table.Column {
+	widths := [5]int{colWidthIP, colWidthMAC, colWidthHostname, colWidthLabel, vendorWidth}
+	cols := make([]table.Column, 5)
+	for i := 0; i < 5; i++ {
+		title := columnTitles[i]
+		if columnSortCol[i] == sortCol {
+			title += sortIndicator(sortAsc)
+		}
+		cols[i] = table.Column{Title: title, Width: widths[i]}
+	}
+	return cols
+}
 
 // newTable creates a configured bubbles table model with default dimensions.
 func newTable() table.Model {
-	cols := []table.Column{
-		{Title: "IP Address", Width: colWidthIP},
-		{Title: "MAC Address", Width: colWidthMAC},
-		{Title: "Hostname", Width: colWidthHostname},
-		{Title: "Label", Width: colWidthLabel},
-		{Title: "Vendor", Width: 30},
-	}
+	cols := buildColumns(SortIP, true, 30)
 	t := table.New(
 		table.WithColumns(cols),
 		table.WithFocused(true),
@@ -70,6 +97,18 @@ func newTable() table.Model {
 	s.Selected = styleSelected
 	t.SetStyles(s)
 	return t
+}
+
+// updateColumns updates column headers with the current sort indicator.
+func updateColumns(m *M) {
+	if m.width == 0 {
+		return
+	}
+	vendorWidth := m.width - 2 - colWidthIP - colWidthMAC - colWidthHostname - colWidthLabel - 10
+	if vendorWidth < 10 {
+		vendorWidth = 10
+	}
+	m.tbl.SetColumns(buildColumns(m.sortCol, m.sortAsc, vendorWidth))
 }
 
 // applySize resizes the table to fill the given terminal dimensions.
@@ -84,27 +123,22 @@ func applySize(m M) M {
 	if vendorWidth < 10 {
 		vendorWidth = 10
 	}
-	m.tbl.SetColumns([]table.Column{
-		{Title: "IP Address", Width: colWidthIP},
-		{Title: "MAC Address", Width: colWidthMAC},
-		{Title: "Hostname", Width: colWidthHostname},
-		{Title: "Label", Width: colWidthLabel},
-		{Title: "Vendor", Width: vendorWidth},
-	})
+	m.tbl.SetColumns(buildColumns(m.sortCol, m.sortAsc, vendorWidth))
 	// 2 border rows + 1 title + 1 status + 1 table header = 5 overhead rows
 	tableHeight := m.height - 5
 	if tableHeight < 1 {
 		tableHeight = 1
 	}
 	m.tbl.SetHeight(tableHeight)
-	m.tbl.SetRows(devicesToRows(m.displayDevices(), m.tags))
+	m.tbl.SetRows(devicesToRows(m.filteredDevices(), m.tags, m.newMACs))
 	return m
 }
 
 // devicesToRows converts state devices to table rows.
 // Offline devices are rendered with dim styling.
+// New devices (in newMACs) are rendered with green/bold styling.
 // tags is a mac→label map; nil is treated as empty.
-func devicesToRows(devices []state.Device, tags map[string]string) []table.Row {
+func devicesToRows(devices []state.Device, tags map[string]string, newMACs map[string]bool) []table.Row {
 	rows := make([]table.Row, len(devices))
 	for i, d := range devices {
 		ip, mac, hostname, label, vendor := d.IP, d.MAC, d.Hostname, tags[d.MAC], d.Vendor
@@ -114,10 +148,71 @@ func devicesToRows(devices []state.Device, tags map[string]string) []table.Row {
 			hostname = styleDim.Render(hostname)
 			label = styleDim.Render(label)
 			vendor = styleDim.Render(vendor)
+		} else if newMACs[d.MAC] {
+			ip = styleNew.Render(ip)
+			mac = styleNew.Render(mac)
+			hostname = styleNew.Render(hostname)
+			label = styleNew.Render(label)
+			vendor = styleNew.Render(vendor)
 		}
 		rows[i] = table.Row{ip, mac, hostname, label, vendor}
 	}
 	return rows
+}
+
+// sortColumnName returns the display name for a sort column.
+func sortColumnName(col SortColumn) string {
+	switch col {
+	case SortIP:
+		return "IP"
+	case SortMAC:
+		return "MAC"
+	case SortHostname:
+		return "Hostname"
+	case SortLabel:
+		return "Label"
+	case SortVendor:
+		return "Vendor"
+	case SortLastSeen:
+		return "Last Seen"
+	default:
+		return "IP"
+	}
+}
+
+// sortDevices sorts a slice of devices in place by the given column and direction.
+func sortDevices(devices []state.Device, col SortColumn, asc bool, tags map[string]string) {
+	sort.SliceStable(devices, func(i, j int) bool {
+		var less bool
+		switch col {
+		case SortIP:
+			a := net.ParseIP(devices[i].IP)
+			b := net.ParseIP(devices[j].IP)
+			if a == nil || b == nil {
+				less = devices[i].IP < devices[j].IP
+			} else {
+				ai := binary.BigEndian.Uint32(a.To4())
+				bi := binary.BigEndian.Uint32(b.To4())
+				less = ai < bi
+			}
+		case SortMAC:
+			less = devices[i].MAC < devices[j].MAC
+		case SortHostname:
+			less = strings.ToLower(devices[i].Hostname) < strings.ToLower(devices[j].Hostname)
+		case SortLabel:
+			less = strings.ToLower(tags[devices[i].MAC]) < strings.ToLower(tags[devices[j].MAC])
+		case SortVendor:
+			less = strings.ToLower(devices[i].Vendor) < strings.ToLower(devices[j].Vendor)
+		case SortLastSeen:
+			less = devices[i].LastSeen.Before(devices[j].LastSeen)
+		default:
+			less = devices[i].IP < devices[j].IP
+		}
+		if !asc {
+			return !less
+		}
+		return less
+	})
 }
 
 // renderView builds the full TUI string from the model.
@@ -131,6 +226,8 @@ func renderView(m M) string {
 	var statusLine string
 	if m.editing {
 		statusLine = styleStatus.Render("Label for "+m.editMAC+":") + " " + m.editInput.View()
+	} else if m.filtering {
+		statusLine = styleStatus.Render("/") + " " + m.filterInput.View()
 	} else {
 		var statusParts []string
 
@@ -142,17 +239,33 @@ func renderView(m M) string {
 			statusParts = append(statusParts, fmt.Sprintf("%d device(s)", online))
 		}
 
+		if len(m.newMACs) > 0 {
+			statusParts = append(statusParts, styleNew.Render(fmt.Sprintf("%d new", len(m.newMACs))))
+		}
+
 		if m.scanning {
-			statusParts = append(statusParts, styleScanning.Render("scanning…"))
+			statusParts = append(statusParts, styleScanning.Render("scanning..."))
 		} else if !m.lastScan.IsZero() {
 			statusParts = append(statusParts, "last scan: "+humanDuration(time.Since(m.lastScan))+" ago")
+		}
+
+		if m.filterText != "" {
+			statusParts = append(statusParts, fmt.Sprintf("filter: %q", m.filterText))
+		}
+
+		dir := "asc"
+		if !m.sortAsc {
+			dir = "desc"
+		}
+		if m.sortCol != SortIP || !m.sortAsc {
+			statusParts = append(statusParts, fmt.Sprintf("sort: %s %s", sortColumnName(m.sortCol), dir))
 		}
 
 		if m.err != nil {
 			statusParts = append(statusParts, styleErr.Render("error: "+m.err.Error()))
 		}
 
-		statusParts = append(statusParts, "↵: details  e: label  o: offline  r: rescan  q: quit")
+		statusParts = append(statusParts, "↵: details  e: label  ←→: sort col  s: sort dir  /: filter  o: offline  r: rescan  q: quit")
 		statusLine = styleStatus.Render(strings.Join(statusParts, "  •  "))
 	}
 
