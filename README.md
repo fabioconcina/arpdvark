@@ -181,8 +181,10 @@ Every scan (TUI, `--json`, `--once`) records which devices are online, building 
 
 ```sh
 # Add to root's crontab (sudo crontab -e):
-*/5 * * * * /path/to/arpdvark --once > /dev/null 2>&1
+*/5 * * * * SUDO_USER=youruser /path/to/arpdvark --once > /dev/null 2>&1
 ```
+
+The `SUDO_USER` variable ensures activity and state data are stored in your home directory (`~youruser/.config/arpdvark/`) rather than root's.
 
 Activity data is stored in `~/.config/arpdvark/activity.json`. The `forget` subcommand also removes activity data for forgotten devices.
 

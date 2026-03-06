@@ -129,7 +129,8 @@ count for the current weekday+hour for every online device. The detail view rend
 as an ASCII heatmap using block characters (space, light, medium, dark, full) normalized
 to the maximum count. For continuous data collection, run periodic scans via cron:
 Add to root's crontab (sudo crontab -e):
-*/5 * * * * /path/to/arpdvark --once > /dev/null 2>&1
+*/5 * * * * SUDO_USER=youruser /path/to/arpdvark --once > /dev/null 2>&1
+SUDO_USER ensures data is stored in the invoking user's home, not root's.
 The `forget` subcommand also removes activity data for forgotten devices.
 
 In the TUI, previously known devices appear immediately on startup (dimmed as offline)
