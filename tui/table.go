@@ -23,10 +23,6 @@ const (
 )
 
 var (
-	styleBorder = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("240"))
-
 	styleTitle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("205"))
@@ -112,6 +108,14 @@ func updateColumns(m *M) {
 	m.tbl.SetColumns(buildColumns(m.sortCol, m.sortAsc, vendorWidth))
 }
 
+// separator returns a horizontal line of the given width.
+func separator(width int) string {
+	if width <= 2 {
+		return ""
+	}
+	return styleDim.Render(" " + strings.Repeat("─", width-2))
+}
+
 // applySize resizes the table to fill the given terminal dimensions.
 // Each column cell has 1-char padding on each side (bubbles default Cell style),
 // so total row width = sum(colWidth+2) for all columns.
@@ -119,13 +123,13 @@ func applySize(m M) M {
 	if m.width == 0 || m.height == 0 {
 		return m
 	}
-	// 2 chars for border (left + right), 10 for cell padding (5 cols × 2)
+	// 2 padding + 10 cell padding (5 cols × 2)
 	vendorWidth := m.width - 2 - colWidthIP - colWidthMAC - colWidthHostname - colWidthLabel - 10
 	if vendorWidth < 10 {
 		vendorWidth = 10
 	}
 	m.tbl.SetColumns(buildColumns(m.sortCol, m.sortAsc, vendorWidth))
-	// 2 border rows + 1 title + 1 status + 1 table header = 5 overhead rows
+	// 1 title + 1 separator + 1 separator + 1 status + 1 table header = 5 overhead rows
 	tableHeight := m.height - 5
 	if tableHeight < 1 {
 		tableHeight = 1
@@ -270,12 +274,10 @@ func renderView(m M) string {
 		statusLine = styleStatus.Render(strings.Join(statusParts, "  •  "))
 	}
 
-	body := strings.Join([]string{title, tableStr, statusLine}, "\n")
-	bs := styleBorder
-	if m.width > 0 {
-		bs = bs.Width(m.width - 2)
-	}
-	return bs.Render(body)
+	sep := separator(m.width)
+	padTitle := " " + title
+	padStatus := " " + statusLine
+	return strings.Join([]string{padTitle, sep, tableStr, sep, padStatus}, "\n")
 }
 
 // detailFieldCount is the number of fields shown in the detail view.
@@ -327,12 +329,11 @@ func renderDetail(m M) string {
 
 	statusLine := styleStatus.Render("↑↓: navigate  esc / ↵: back")
 
-	body := title + "\n\n" + strings.Join(rows, "\n") + "\n" + heatmapStr + "\n\n" + statusLine
-	bs := styleBorder
-	if m.width > 0 {
-		bs = bs.Width(m.width - 2)
-	}
-	return bs.Render(body)
+	sep := separator(m.width)
+	padTitle := " " + title
+	padStatus := " " + statusLine
+	body := padTitle + "\n" + sep + "\n\n" + strings.Join(rows, "\n") + "\n" + heatmapStr + "\n\n" + sep + "\n" + padStatus
+	return body
 }
 
 // renderSplash renders the logo centered in the terminal for the splash screen.

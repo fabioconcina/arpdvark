@@ -5,7 +5,7 @@ LDFLAGS := -ldflags "-X main.version=$(VERSION)"
 .PHONY: build build-all update-oui clean
 
 build:
-	go build $(LDFLAGS) -o $(BINARY) .
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(BINARY) .
 
 build-all:
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o dist/$(BINARY)-linux-amd64 .
