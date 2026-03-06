@@ -12,6 +12,7 @@ import (
 
 	"github.com/fabioconcina/arpdvark/activity"
 	"github.com/fabioconcina/arpdvark/exitcode"
+	"github.com/fabioconcina/arpdvark/latency"
 	"github.com/fabioconcina/arpdvark/mcpserver"
 	"github.com/fabioconcina/arpdvark/output"
 	"github.com/fabioconcina/arpdvark/scanner"
@@ -119,6 +120,12 @@ func main() {
 		actStore = activity.Empty()
 	}
 
+	latStore, err := latency.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not load latency file: %v\n", err)
+		latStore = latency.Empty()
+	}
+
 	// Single-shot modes: scan once and exit.
 	if jsonOutput || onceOutput {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -136,6 +143,16 @@ func main() {
 		}
 		actStore.Record(onlineMACs, time.Now())
 		actStore.Save()
+
+		// Record latency history for discovered devices.
+		latencies := make(map[string]time.Duration, len(devices))
+		for _, d := range devices {
+			if d.Latency > 0 {
+				latencies[d.MAC.String()] = d.Latency
+			}
+		}
+		latStore.RecordAll(latencies)
+		latStore.Save()
 
 		allTags := store.All()
 
@@ -181,7 +198,7 @@ func main() {
 	}
 
 	// Default: interactive TUI.
-	m := tui.New(sc, store, stateStore, actStore, time.Duration(interval)*time.Second, version)
+	m := tui.New(sc, store, stateStore, actStore, latStore, time.Duration(interval)*time.Second, version)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -210,6 +227,12 @@ func runForget(args []string) {
 		actStore = activity.Empty()
 	}
 
+	latStore, err := latency.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not load latency file: %v\n", err)
+		latStore = latency.Empty()
+	}
+
 	if *olderThan > 0 {
 		cutoff := time.Now().AddDate(0, 0, -*olderThan)
 		n, err := stateStore.ForgetOlderThan(cutoff)
@@ -232,7 +255,9 @@ func runForget(args []string) {
 			os.Exit(exitcode.GeneralError)
 		}
 		actStore.Forget(mac)
+		latStore.Forget(mac)
 		fmt.Printf("Removed %s\n", mac)
 	}
 	actStore.Save()
+	latStore.Save()
 }

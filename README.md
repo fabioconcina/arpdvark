@@ -17,12 +17,12 @@ A minimal, fast terminal-based network inventory tool. Scans your local network 
 ```
 arpdvark  •  interface: eth0  •  subnet: 192.168.1.0/24
 
-IP Address       MAC Address         Hostname        Label     Vendor
-192.168.1.1      30:1f:48:10:f3:04   router.home     router    zte corp.
-192.168.1.2      a8:1d:16:31:a6:4f   laptop.home               AzureWave
-192.168.1.5      98:e2:55:7f:8a:48                   switch    Nintendo
-192.168.1.112    34:af:b3:82:16:95   echo.home       echo      Amazon Tech.
-192.168.1.136    ea:03:65:53:c9:62                              Local/Random.
+IP Address       MAC Address         Hostname        Label     Vendor          Latency
+192.168.1.1      30:1f:48:10:f3:04   router.home     router    zte corp.       1.2ms
+192.168.1.2      a8:1d:16:31:a6:4f   laptop.home               AzureWave       3.5ms
+192.168.1.5      98:e2:55:7f:8a:48                   switch    Nintendo        0.8ms
+192.168.1.112    34:af:b3:82:16:95   echo.home       echo      Amazon Tech.    12ms
+192.168.1.136    ea:03:65:53:c9:62                              Local/Random.   45ms
 
 5 device(s)  •  last scan: 2s ago  •  e: label  r: rescan  q: quit
 ```
@@ -44,6 +44,8 @@ IP Address       MAC Address         Hostname        Label     Vendor
 - **Device filtering** — press `/` to filter the device table by any field; matches IP, MAC, hostname, label, and vendor; press `/` again to clear
 - **New device alerts** — devices seen for the first time (not in the state file from previous runs) are highlighted in green in the TUI, with a count in the status bar
 - **Activity heatmap** — the detail view shows a weekly activity pattern (7 days x 24 hours) built from scan history, using block characters to visualize when a device is typically connected; activity is recorded in all modes (TUI, `--json`, `--once`) and persisted to `~/.config/arpdvark/activity.json`
+- **Ping latency** — after each ARP sweep, sends ICMP echo requests to all discovered devices concurrently and displays round-trip time per device; shown in the TUI table, detail view, and all output modes (`--json`, `--once`, MCP)
+- **Latency history** — the detail view shows an IQR box plot of latency measurements accumulated over time (last 100 samples per device), with min/Q1/median/Q3/max statistics; latency history is recorded in all modes and persisted to `~/.config/arpdvark/latency.json`
 - **Rate-limited scanning** — ARP requests are rate-limited (1000 pkt/s for /24 and smaller, 5000 pkt/s for larger subnets) to avoid overwhelming switches or triggering IDS alerts
 
 ## Installation
@@ -97,14 +99,14 @@ sudo arpdvark -i eth0 --large
 | `r` | Force immediate rescan |
 | `↑` / `↓` | Navigate table rows |
 | `e` | Edit label for selected row |
-| `←` / `→` | Cycle sort column (IP, MAC, Hostname, Label, Vendor, Last Seen) |
+| `←` / `→` | Cycle sort column (IP, MAC, Hostname, Label, Vendor, Latency, Last Seen) |
 | `s` | Toggle sort direction (ascending / descending) |
 | `/` | Open filter (Enter to apply, Esc to clear, `/` again to clear) |
 | `o` | Toggle show/hide offline devices |
 | `Enter` | Open device detail view |
 | `Esc` / `Enter` | Close detail view / close filter / cancel label edit |
 
-**Detail view** (`Enter` on a row): shows all device fields untruncated — IP, MAC, hostname, label, vendor, status, first seen, last seen — plus a weekly activity heatmap showing when the device is typically online. Navigate fields with `↑`/`↓`.
+**Detail view** (`Enter` on a row): shows all device fields untruncated — IP, MAC, hostname, label, vendor, latency, status, first seen, last seen — plus a weekly activity heatmap and a latency history box plot (IQR). Navigate fields with `↑`/`↓`.
 
 ### JSON output (`--json`)
 
@@ -124,7 +126,8 @@ Runs a single scan, prints a JSON array to stdout, and exits. Suitable for pipin
     "hostname": "router.local",
     "label": "main-router",
     "first_seen": "2024-01-01T00:00:00Z",
-    "last_seen": "2024-01-01T00:00:00Z"
+    "last_seen": "2024-01-01T00:00:00Z",
+    "latency_ms": 1.23
   }
 ]
 ```

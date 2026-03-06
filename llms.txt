@@ -19,8 +19,8 @@ Requires Linux and root/CAP_NET_RAW. Install from source:
 Full-screen terminal UI with auto-refresh, keyboard navigation, label editing, and device detail view.
 
 Key bindings: q/ctrl+c quit; r rescan; up/down navigate; e edit label; left/right cycle sort column; s toggle sort direction; / filter (/ again to clear); o toggle offline; Enter open detail view.
-Detail view: shows all fields untruncated (IP, MAC, hostname, label, vendor, status, first/last seen) plus a weekly activity heatmap; up/down to navigate.
-Sorting: left/right arrows cycle through IP, MAC, Hostname, Label, Vendor, Last Seen; s toggles asc/desc.
+Detail view: shows all fields untruncated (IP, MAC, hostname, label, vendor, latency, status, first/last seen) plus a weekly activity heatmap and latency history box plot (IQR); up/down to navigate.
+Sorting: left/right arrows cycle through IP, MAC, Hostname, Label, Vendor, Latency, Last Seen; s toggles asc/desc.
 Filtering: / opens filter input; matches against all fields; Enter applies, Esc clears filter, / again also clears active filter.
 New device alerts: devices not in state.json from previous runs are highlighted green with a count in the status bar.
 
@@ -40,7 +40,8 @@ Output format:
         "hostname": "router.local",
         "label": "main-router",
         "first_seen": "2024-01-01T00:00:00Z",
-        "last_seen": "2024-01-01T00:00:00Z"
+        "last_seen": "2024-01-01T00:00:00Z",
+        "latency_ms": 1.23
       }
     ]
 
@@ -120,6 +121,22 @@ and are included in all output modes (TUI, JSON, table, MCP).
 
 Scan results are saved to ~/.config/arpdvark/state.json across runs. Each device is
 keyed by MAC address and tracks IP, vendor, hostname, first_seen, and last_seen.
+
+## Ping latency
+
+After each ARP sweep, ICMP echo requests are sent concurrently to all discovered devices
+(1-second timeout per device). Round-trip time is displayed in the TUI table and detail view,
+and included in all output modes. In JSON output, the field is `latency_ms` (float, omitted
+if no measurement). Latency is ephemeral (not persisted to state.json) and measured fresh
+on each scan.
+
+## Latency history
+
+Each scan records latency measurements in a per-MAC circular buffer (last 100 samples)
+stored in ~/.config/arpdvark/latency.json. The device detail view shows an IQR box plot
+with min, Q1, median, Q3, max statistics. Data accumulates across runs and is recorded
+in all modes (TUI, --json, --once, MCP). The `forget` subcommand also removes latency
+history for forgotten devices.
 
 ## Activity tracking
 

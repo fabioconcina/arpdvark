@@ -9,6 +9,8 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
+	"github.com/fabioconcina/arpdvark/activity"
+	"github.com/fabioconcina/arpdvark/latency"
 	"github.com/fabioconcina/arpdvark/output"
 	"github.com/fabioconcina/arpdvark/scanner"
 	"github.com/fabioconcina/arpdvark/tags"
@@ -55,6 +57,24 @@ func handleScan(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResu
 	devices, err := sc.Scan(scanCtx)
 	if err != nil {
 		return toolError(fmt.Sprintf("scan failed: %v", err)), nil
+	}
+
+	// Record activity and latency history.
+	onlineMACs := make([]string, len(devices))
+	latencies := make(map[string]time.Duration)
+	for i, d := range devices {
+		onlineMACs[i] = d.MAC.String()
+		if d.Latency > 0 {
+			latencies[d.MAC.String()] = d.Latency
+		}
+	}
+	if actStore, err := activity.Load(); err == nil {
+		actStore.Record(onlineMACs, time.Now())
+		actStore.Save()
+	}
+	if latStore, err := latency.Load(); err == nil {
+		latStore.RecordAll(latencies)
+		latStore.Save()
 	}
 
 	store, err := tags.Load()

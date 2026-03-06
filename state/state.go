@@ -14,6 +14,9 @@ import (
 	"github.com/fabioconcina/arpdvark/scanner"
 )
 
+// latencyByMAC stores transient latency measurements (not persisted).
+var latencyByMAC sync.Map // map[string]time.Duration
+
 // Record is a single persisted device entry, keyed by MAC address.
 type Record struct {
 	IP        string    `json:"ip"`
@@ -32,6 +35,7 @@ type Device struct {
 	FirstSeen time.Time
 	LastSeen  time.Time
 	Online    bool
+	Latency   time.Duration // ICMP RTT; 0 means no measurement (offline or no reply)
 }
 
 // Store holds persisted device records and manages the state file.
@@ -92,6 +96,13 @@ func (s *Store) Merge(scanned []scanner.Device) ([]Device, error) {
 	for _, d := range scanned {
 		mac := d.MAC.String()
 		onlineMACs[mac] = true
+
+		// Store transient latency measurement.
+		if d.Latency > 0 {
+			latencyByMAC.Store(mac, d.Latency)
+		} else {
+			latencyByMAC.Delete(mac)
+		}
 
 		existing, ok := s.data[mac]
 		if ok {
@@ -159,6 +170,10 @@ func (s *Store) ForgetOlderThan(cutoff time.Time) (int, error) {
 func (s *Store) allDevices(onlineMACs map[string]bool) []Device {
 	out := make([]Device, 0, len(s.data))
 	for mac, r := range s.data {
+		var lat time.Duration
+		if v, ok := latencyByMAC.Load(mac); ok {
+			lat = v.(time.Duration)
+		}
 		out = append(out, Device{
 			MAC:       mac,
 			IP:        r.IP,
@@ -167,6 +182,7 @@ func (s *Store) allDevices(onlineMACs map[string]bool) []Device {
 			FirstSeen: r.FirstSeen,
 			LastSeen:  r.LastSeen,
 			Online:    onlineMACs[mac],
+			Latency:   lat,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
