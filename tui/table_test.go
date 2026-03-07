@@ -55,7 +55,7 @@ func TestDevicesToRows(t *testing.T) {
 			Online:   true,
 		},
 	}
-	rows := devicesToRows(devices, nil, nil)
+	rows := devicesToRows(devices, nil)
 	if len(rows) != 2 {
 		t.Fatalf("devicesToRows() = %d rows, want 2", len(rows))
 	}
@@ -84,7 +84,7 @@ func TestDevicesToRows(t *testing.T) {
 }
 
 func TestDevicesToRows_Empty(t *testing.T) {
-	rows := devicesToRows(nil, nil, nil)
+	rows := devicesToRows(nil, nil)
 	if len(rows) != 0 {
 		t.Errorf("devicesToRows(nil) = %d rows, want 0", len(rows))
 	}
@@ -95,7 +95,7 @@ func TestDevicesToRows_WithLabels(t *testing.T) {
 		{IP: "192.168.1.1", MAC: "aa:bb:cc:dd:ee:ff", Hostname: "router", Vendor: "Acme", Online: true},
 	}
 	labels := map[string]string{"aa:bb:cc:dd:ee:ff": "my-router"}
-	rows := devicesToRows(devices, labels, nil)
+	rows := devicesToRows(devices, labels)
 	if rows[0][3] != "my-router" {
 		t.Errorf("label col = %q, want %q", rows[0][3], "my-router")
 	}
@@ -108,37 +108,30 @@ func TestDevicesToRows_NoLabel(t *testing.T) {
 	devices := []state.Device{
 		{IP: "192.168.1.2", MAC: "11:22:33:44:55:66", Online: true},
 	}
-	rows := devicesToRows(devices, nil, nil)
+	rows := devicesToRows(devices, nil)
 	if rows[0][3] != "" {
 		t.Errorf("label col = %q, want empty", rows[0][3])
 	}
 }
 
-func TestDevicesToRows_OfflineDimmed(t *testing.T) {
+func TestDevicesToRows_OfflinePrefix(t *testing.T) {
 	devices := []state.Device{
 		{IP: "192.168.1.1", MAC: "aa:bb:cc:dd:ee:ff", Vendor: "Acme", Online: false},
 	}
-	rows := devicesToRows(devices, nil, nil)
-	// Offline rows should contain ANSI escape sequences from the dim style.
-	if rows[0][0] == "192.168.1.1" {
-		t.Error("offline device IP should be styled (contain ANSI escapes)")
+	rows := devicesToRows(devices, nil)
+	want := "○ 192.168.1.1"
+	if rows[0][0] != want {
+		t.Errorf("offline device IP = %q, want %q", rows[0][0], want)
 	}
 }
 
-func TestDevicesToRows_NewDeviceStyled(t *testing.T) {
+func TestDevicesToRows_OnlineNoPrefix(t *testing.T) {
 	devices := []state.Device{
 		{IP: "192.168.1.1", MAC: "aa:bb:cc:dd:ee:ff", Vendor: "Acme", Online: true},
-		{IP: "192.168.1.2", MAC: "11:22:33:44:55:66", Vendor: "Other", Online: true},
 	}
-	newMACs := map[string]bool{"aa:bb:cc:dd:ee:ff": true}
-	rows := devicesToRows(devices, nil, newMACs)
-	// New device rows should contain ANSI escape sequences from the new style.
-	if rows[0][0] == "192.168.1.1" {
-		t.Error("new device IP should be styled (contain ANSI escapes)")
-	}
-	// Non-new device should be plain.
-	if rows[1][0] != "192.168.1.2" {
-		t.Errorf("non-new device IP = %q, want plain %q", rows[1][0], "192.168.1.2")
+	rows := devicesToRows(devices, nil)
+	if rows[0][0] != "192.168.1.1" {
+		t.Errorf("online device IP = %q, want %q", rows[0][0], "192.168.1.1")
 	}
 }
 
