@@ -138,35 +138,23 @@ func applySize(m M) M {
 		tableHeight = 1
 	}
 	m.tbl.SetHeight(tableHeight)
-	m.tbl.SetRows(devicesToRows(m.filteredDevices(), m.tags, m.newMACs))
+	m.tbl.SetRows(devicesToRows(m.filteredDevices(), m.tags))
 	return m
 }
 
 // devicesToRows converts state devices to table rows.
-// Offline devices are rendered with dim styling.
-// New devices (in newMACs) are rendered with green/bold styling.
-// tags is a mac→label map; nil is treated as empty.
-func devicesToRows(devices []state.Device, tags map[string]string, newMACs map[string]bool) []table.Row {
+// Cell values are plain text only — the bubbles table uses runewidth.Truncate
+// which is not ANSI-aware and corrupts escape sequences.
+func devicesToRows(devices []state.Device, tags map[string]string) []table.Row {
 	rows := make([]table.Row, len(devices))
 	for i, d := range devices {
-		ip, mac, hostname, label, vendor := d.IP, d.MAC, d.Hostname, tags[d.MAC], d.Vendor
-		latency := formatLatency(d.Latency)
+		ip := d.IP
 		if !d.Online {
-			ip = styleDim.Render(ip)
-			mac = styleDim.Render(mac)
-			hostname = styleDim.Render(hostname)
-			label = styleDim.Render(label)
-			vendor = styleDim.Render(vendor)
-			latency = styleDim.Render(latency)
-		} else if newMACs[d.MAC] {
-			ip = styleNew.Render(ip)
-			mac = styleNew.Render(mac)
-			hostname = styleNew.Render(hostname)
-			label = styleNew.Render(label)
-			vendor = styleNew.Render(vendor)
-			latency = styleNew.Render(latency)
+			ip = "○ " + d.IP
 		}
-		rows[i] = table.Row{ip, mac, hostname, label, vendor, latency}
+		rows[i] = table.Row{
+			ip, d.MAC, d.Hostname, tags[d.MAC], d.Vendor, formatLatency(d.Latency),
+		}
 	}
 	return rows
 }

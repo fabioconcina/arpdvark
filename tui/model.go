@@ -293,14 +293,11 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, textinput.Blink
 
 		case "e":
-			if len(m.filteredDevices()) == 0 {
+			devices := m.filteredDevices()
+			if len(devices) == 0 {
 				return m, nil
 			}
-			sel := m.tbl.SelectedRow()
-			if sel == nil {
-				return m, nil
-			}
-			mac := sel[1]
+			mac := devices[m.tbl.Cursor()].MAC
 			m.editMAC = mac
 			m.editInput.SetValue(m.tags[mac])
 			m.editInput.Focus()
@@ -434,7 +431,7 @@ func (m M) filteredDevices() []state.Device {
 // refreshTable updates the table columns (sort indicator) and rows from current state.
 func refreshTable(m *M) {
 	updateColumns(m)
-	m.tbl.SetRows(devicesToRows(m.filteredDevices(), m.tags, m.newMACs))
+	m.tbl.SetRows(devicesToRows(m.filteredDevices(), m.tags))
 }
 
 // scanCmd returns a Cmd that runs a scan in the background and sends ScanCompleteMsg.
