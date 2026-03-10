@@ -2,6 +2,8 @@ package tui
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 
 	"github.com/fabioconcina/arpdvark/activity"
 	"github.com/fabioconcina/arpdvark/latency"
+	"github.com/fabioconcina/arpdvark/notify"
 	"github.com/fabioconcina/arpdvark/scanner"
 	"github.com/fabioconcina/arpdvark/state"
 	"github.com/fabioconcina/arpdvark/tags"
@@ -91,10 +94,11 @@ type M struct {
 
 	activityStore *activity.Store
 	latencyStore  *latency.Store
+	notifyURL     string
 }
 
 // New creates a new TUI model.
-func New(sc *scanner.Scanner, store *tags.Store, stateStore *state.Store, actStore *activity.Store, latStore *latency.Store, interval time.Duration, version string) M {
+func New(sc *scanner.Scanner, store *tags.Store, stateStore *state.Store, actStore *activity.Store, latStore *latency.Store, interval time.Duration, version string, notifyURL string) M {
 	ti := textinput.New()
 	ti.Placeholder = "enter label (empty to clear)"
 	ti.CharLimit = 64
@@ -130,6 +134,7 @@ func New(sc *scanner.Scanner, store *tags.Store, stateStore *state.Store, actSto
 		newMACs:       make(map[string]bool),
 		activityStore: actStore,
 		latencyStore:  latStore,
+		notifyURL:     notifyURL,
 	}
 }
 
@@ -333,12 +338,22 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.err = nil
 			m.devices = msg.Devices
-			// Detect new devices.
+			// Detect new devices and notify.
+			var newDevices []scanner.Device
 			for _, d := range msg.Devices {
 				mac := d.MAC.String()
 				if !m.knownMACs[mac] {
 					m.newMACs[mac] = true
+					newDevices = append(newDevices, d)
 				}
+			}
+			if m.notifyURL != "" && len(newDevices) > 0 {
+				url := m.notifyURL
+				go func() {
+					if err := notify.Send(url, newDevices); err != nil {
+						fmt.Fprintf(os.Stderr, "Warning: notification failed: %v\n", err)
+					}
+				}()
 			}
 			// Record activity for online devices.
 			onlineMACs := make([]string, len(msg.Devices))

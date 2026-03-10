@@ -91,6 +91,7 @@ Claude Desktop configuration example:
     --once          Single scan, text table output, exit
     --all           Include offline devices (--json and --once only)
     --mcp           Run as MCP server (stdio)
+    --notify-url    POST to URL when new devices are detected
     --version       Print version and exit
 
 ## Subcommands
@@ -157,3 +158,12 @@ With --json --all or --once --all, offline devices are included in the output wi
 "online" field (true/false for JSON, STATUS column for text table).
 
 Use `arpdvark forget` to remove devices from the state file.
+
+## Notifications
+
+Use --notify-url to POST a plain-text notification when new devices are detected.
+Works in all modes (TUI, --json, --once). Compatible with ntfy.sh, Slack webhooks,
+or any endpoint accepting POST with text/plain body. Each notification lists new
+devices with IP, MAC, vendor, and hostname. Example:
+
+    sudo arpdvark --once --notify-url https://ntfy.sh/my-network

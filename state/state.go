@@ -137,6 +137,14 @@ func (s *Store) All() []Device {
 	return s.allDevices(nil)
 }
 
+// Known returns true if the MAC address exists in the state store.
+func (s *Store) Known(mac string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok := s.data[mac]
+	return ok
+}
+
 // Forget removes a device by MAC address and persists to disk.
 func (s *Store) Forget(mac string) error {
 	s.mu.Lock()

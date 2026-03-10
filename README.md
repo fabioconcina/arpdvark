@@ -74,6 +74,7 @@ Options:
   --once            Run one scan and print a plain-text table to stdout
   --all             Include offline devices (--json and --once only)
   --mcp             Run as MCP server (stdio transport)
+  --notify-url URL  POST to URL when new devices are detected (e.g. ntfy.sh topic)
   --version         Print version and exit
   -h                Show help
 ```
@@ -190,6 +191,21 @@ Every scan (TUI, `--json`, `--once`) records which devices are online, building 
 The `SUDO_USER` variable ensures activity and state data are stored in your home directory (`~youruser/.config/arpdvark/`) rather than root's.
 
 Activity data is stored in `~/.config/arpdvark/activity.json`. The `forget` subcommand also removes activity data for forgotten devices.
+
+### Notifications
+
+Use `--notify-url` to get notified when new devices appear on the network. A POST request with a plain-text body is sent to the URL for each batch of new devices. Works with [ntfy](https://ntfy.sh), Slack webhooks, or any endpoint that accepts POST requests.
+
+```sh
+sudo arpdvark --notify-url https://ntfy.sh/my-network
+sudo arpdvark --once --notify-url https://ntfy.sh/my-network
+```
+
+Combine with a cron job for continuous monitoring:
+
+```sh
+*/5 * * * * SUDO_USER=youruser /path/to/arpdvark --once --notify-url https://ntfy.sh/my-network > /dev/null 2>&1
+```
 
 ### Exit codes
 

@@ -14,6 +14,7 @@ import (
 	"github.com/fabioconcina/arpdvark/exitcode"
 	"github.com/fabioconcina/arpdvark/latency"
 	"github.com/fabioconcina/arpdvark/mcpserver"
+	"github.com/fabioconcina/arpdvark/notify"
 	"github.com/fabioconcina/arpdvark/output"
 	"github.com/fabioconcina/arpdvark/scanner"
 	"github.com/fabioconcina/arpdvark/state"
@@ -39,6 +40,7 @@ func main() {
 		onceOutput  bool
 		mcpMode     bool
 		allDevices  bool
+		notifyURL   string
 	)
 
 	flag.StringVar(&ifaceName, "i", "", "Network interface to scan (default: auto-detect)")
@@ -49,6 +51,7 @@ func main() {
 	flag.BoolVar(&onceOutput, "once", false, "Run one scan and print a table to stdout")
 	flag.BoolVar(&mcpMode, "mcp", false, "Run as MCP server (stdio transport)")
 	flag.BoolVar(&allDevices, "all", false, "Include offline devices (--json and --once only)")
+	flag.StringVar(&notifyURL, "notify-url", "", "URL to POST when new devices are detected (e.g. ntfy.sh topic)")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: arpdvark [options]\n       arpdvark forget [--older-than N] [MAC ...]\n\nOptions:\n")
 		flag.PrintDefaults()
@@ -154,6 +157,19 @@ func main() {
 		latStore.RecordAll(latencies)
 		latStore.Save()
 
+		// Notify for new devices (check before Merge adds them to state).
+		if notifyURL != "" {
+			var newDevices []scanner.Device
+			for _, d := range devices {
+				if !stateStore.Known(d.MAC.String()) {
+					newDevices = append(newDevices, d)
+				}
+			}
+			if err := notify.Send(notifyURL, newDevices); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: notification failed: %v\n", err)
+			}
+		}
+
 		allTags := store.All()
 
 		if allDevices {
@@ -198,7 +214,7 @@ func main() {
 	}
 
 	// Default: interactive TUI.
-	m := tui.New(sc, store, stateStore, actStore, latStore, time.Duration(interval)*time.Second, version)
+	m := tui.New(sc, store, stateStore, actStore, latStore, time.Duration(interval)*time.Second, version, notifyURL)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
