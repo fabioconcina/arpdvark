@@ -4,17 +4,18 @@
 
 ## Quick start
 
-Requires Linux and root/CAP_NET_RAW. Install from source:
+Requires Linux and CAP_NET_RAW. Install from source:
 
     git clone https://github.com/fabioconcina/arpdvark
     cd arpdvark && make build
-    sudo ./arpdvark
+    sudo setcap cap_net_raw+ep ./arpdvark
+    ./arpdvark
 
 ## CLI modes
 
 ### Interactive TUI (default)
 
-    sudo arpdvark [-i <interface>] [-t <seconds>] [--large]
+    arpdvark [-i <interface>] [-t <seconds>] [--large]
 
 Full-screen terminal UI with auto-refresh, keyboard navigation, label editing, and device detail view.
 
@@ -26,7 +27,7 @@ New device alerts: devices not in state.json from previous runs are highlighted 
 
 ### JSON output (--json)
 
-    sudo arpdvark --json [-i <interface>] [--large]
+    arpdvark --json [-i <interface>] [--large]
 
 Single scan, JSON array to stdout. Suitable for piping to jq, scripts, or other tools.
 
@@ -49,7 +50,7 @@ With --all, includes an "online" field (true/false) for each device.
 
 ### Human-readable table (--once)
 
-    sudo arpdvark --once [-i <interface>] [--large]
+    arpdvark --once [-i <interface>] [--large]
 
 Single scan, tab-aligned text table to stdout. Parseable with awk/cut.
 
@@ -70,8 +71,8 @@ Claude Desktop configuration example:
     {
       "mcpServers": {
         "arpdvark": {
-          "command": "sudo",
-          "args": ["/path/to/arpdvark", "--mcp"]
+          "command": "/path/to/arpdvark",
+          "args": ["--mcp"]
         }
       }
     }
@@ -109,9 +110,9 @@ the device table accumulates across sweeps.
 
 ## Permissions
 
-Uses raw ARP sockets (AF_PACKET). Requires sudo or CAP_NET_RAW:
+Uses raw ARP sockets (AF_PACKET). Requires CAP_NET_RAW:
 
-    sudo setcap cap_net_raw+ep ./arpdvark
+    sudo setcap cap_net_raw+ep /path/to/arpdvark
 
 ## Labels
 
@@ -146,9 +147,8 @@ Every scan mode (TUI, --json, --once) records device sightings in a per-MAC 7x24
 count for the current weekday+hour for every online device. The detail view renders this
 as an ASCII heatmap using block characters (space, light, medium, dark, full) normalized
 to the maximum count. For continuous data collection, run periodic scans via cron:
-Add to root's crontab (sudo crontab -e):
-*/5 * * * * SUDO_USER=youruser /path/to/arpdvark --once > /dev/null 2>&1
-SUDO_USER ensures data is stored in the invoking user's home, not root's.
+Add to your crontab (crontab -e):
+*/5 * * * * /path/to/arpdvark --once > /dev/null 2>&1
 The `forget` subcommand also removes activity data for forgotten devices.
 
 In the TUI, previously known devices appear immediately on startup (dimmed as offline)
@@ -166,4 +166,4 @@ Works in all modes (TUI, --json, --once). Compatible with ntfy.sh, Slack webhook
 or any endpoint accepting POST with text/plain body. Each notification lists new
 devices with IP, MAC, vendor, and hostname. Example:
 
-    sudo arpdvark --once --notify-url https://ntfy.sh/my-network
+    arpdvark --once --notify-url https://ntfy.sh/my-network

@@ -58,7 +58,13 @@ cd arpdvark
 make build-all          # produces dist/arpdvark-linux-amd64 and dist/arpdvark-linux-arm64
 ```
 
-Copy the appropriate binary to your Linux machine and place it in your `PATH`.
+Copy the appropriate binary to your Linux machine and grant it network access:
+
+```sh
+sudo setcap cap_net_raw+ep /path/to/arpdvark
+```
+
+This only needs to be run once after each build or deploy. After that, arpdvark runs without `sudo`.
 
 ## Usage
 
@@ -83,13 +89,13 @@ Options:
 
 ```sh
 # Auto-detect interface, refresh every 10s
-sudo arpdvark
+arpdvark
 
 # Scan a specific interface every 5 seconds
-sudo arpdvark -i eth0 -t 5
+arpdvark -i eth0 -t 5
 
 # Scan a large subnet (up to /8)
-sudo arpdvark -i eth0 --large
+arpdvark -i eth0 --large
 ```
 
 **Key bindings:**
@@ -112,8 +118,8 @@ sudo arpdvark -i eth0 --large
 ### JSON output (`--json`)
 
 ```sh
-sudo arpdvark --json
-sudo arpdvark --json -i eth0
+arpdvark --json
+arpdvark --json -i eth0
 ```
 
 Runs a single scan, prints a JSON array to stdout, and exits. Suitable for piping to `jq`, scripts, or other tools.
@@ -136,7 +142,7 @@ Runs a single scan, prints a JSON array to stdout, and exits. Suitable for pipin
 Use `--all` to include offline (previously seen) devices:
 
 ```sh
-sudo arpdvark --json --all
+arpdvark --json --all
 ```
 
 With `--all`, each device includes an `"online"` field (`true`/`false`).
@@ -144,7 +150,7 @@ With `--all`, each device includes an `"online"` field (`true`/`false`).
 ### Plain-text table (`--once`)
 
 ```sh
-sudo arpdvark --once
+arpdvark --once
 ```
 
 Runs a single scan, prints a tab-aligned text table to stdout, and exits. Parseable with `awk`/`cut`.
@@ -163,8 +169,8 @@ Runs an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server o
 {
   "mcpServers": {
     "arpdvark": {
-      "command": "sudo",
-      "args": ["/path/to/arpdvark", "--mcp"]
+      "command": "/path/to/arpdvark",
+      "args": ["--mcp"]
     }
   }
 }
@@ -184,11 +190,9 @@ arpdvark forget --older-than 30             # remove devices unseen for 30+ days
 Every scan (TUI, `--json`, `--once`) records which devices are online, building a weekly activity heatmap visible in the detail view (`Enter` on a device). To get useful data, run periodic scans in the background with a cron job:
 
 ```sh
-# Add to root's crontab (sudo crontab -e):
-*/5 * * * * SUDO_USER=youruser /path/to/arpdvark --once > /dev/null 2>&1
+# Add to your crontab (crontab -e):
+*/5 * * * * /path/to/arpdvark --once > /dev/null 2>&1
 ```
-
-The `SUDO_USER` variable ensures activity and state data are stored in your home directory (`~youruser/.config/arpdvark/`) rather than root's.
 
 Activity data is stored in `~/.config/arpdvark/activity.json`. The `forget` subcommand also removes activity data for forgotten devices.
 
@@ -197,14 +201,14 @@ Activity data is stored in `~/.config/arpdvark/activity.json`. The `forget` subc
 Use `--notify-url` to get notified when new devices appear on the network. A POST request with a plain-text body is sent to the URL for each batch of new devices. Works with [ntfy](https://ntfy.sh), Slack webhooks, or any endpoint that accepts POST requests.
 
 ```sh
-sudo arpdvark --notify-url https://ntfy.sh/my-network
-sudo arpdvark --once --notify-url https://ntfy.sh/my-network
+arpdvark --notify-url https://ntfy.sh/my-network
+arpdvark --once --notify-url https://ntfy.sh/my-network
 ```
 
 Combine with a cron job for continuous monitoring:
 
 ```sh
-*/5 * * * * SUDO_USER=youruser /path/to/arpdvark --once --notify-url https://ntfy.sh/my-network > /dev/null 2>&1
+*/5 * * * * /path/to/arpdvark --once --notify-url https://ntfy.sh/my-network > /dev/null 2>&1
 ```
 
 ### Exit codes
@@ -216,15 +220,6 @@ Exit codes apply to `--json` and `--once` modes:
 | 0 | Success (devices found) |
 | 1 | Error (permissions, interface not found, scan failure) |
 | 2 | Scan completed but no devices found |
-
-## Permissions
-
-arpdvark uses raw ARP sockets (`AF_PACKET`) and requires elevated privileges. Run with `sudo`, or grant `CAP_NET_RAW` to avoid it:
-
-```sh
-sudo setcap cap_net_raw+ep ./arpdvark
-./arpdvark
-```
 
 ## Hostname resolution
 
