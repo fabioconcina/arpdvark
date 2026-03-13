@@ -105,6 +105,7 @@ arpdvark -i eth0 --large
 | `r` | Force immediate rescan |
 | `↑` / `↓` | Navigate table rows |
 | `e` | Edit label for selected row |
+| `d` | Forget selected device (removes from state, tags, and activity) |
 | `←` / `→` | Cycle sort column (IP, MAC, Hostname, Label, Vendor, Last Seen) |
 | `s` | Toggle sort direction (ascending / descending) |
 | `/` | Open filter (Enter to apply, Esc to clear, `/` again to clear) |
@@ -192,7 +193,7 @@ Every scan (TUI, `--json`, `--once`) records which devices are online, building 
 */5 * * * * /path/to/arpdvark --once > /dev/null 2>&1
 ```
 
-Activity data is stored in `~/.config/arpdvark/activity.json`. The `forget` subcommand also removes activity data for forgotten devices.
+Activity data is stored in `~/.config/arpdvark/activity.json`. The `forget` subcommand also removes activity data and labels for forgotten devices.
 
 ### Notifications
 

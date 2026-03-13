@@ -167,12 +167,12 @@ func TestForgetOlderThan(t *testing.T) {
 	}
 
 	cutoff := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
-	n, err := s.ForgetOlderThan(cutoff)
+	removed, err := s.ForgetOlderThan(cutoff)
 	if err != nil {
 		t.Fatalf("ForgetOlderThan: %v", err)
 	}
-	if n != 1 {
-		t.Errorf("removed %d, want 1", n)
+	if len(removed) != 1 {
+		t.Errorf("removed %d, want 1", len(removed))
 	}
 
 	all := s.All()

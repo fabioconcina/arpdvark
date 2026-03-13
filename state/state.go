@@ -143,23 +143,23 @@ func (s *Store) Forget(mac string) error {
 }
 
 // ForgetOlderThan removes devices whose LastSeen is before cutoff.
-// Returns the number of removed entries.
-func (s *Store) ForgetOlderThan(cutoff time.Time) (int, error) {
+// Returns the MAC addresses of removed entries.
+func (s *Store) ForgetOlderThan(cutoff time.Time) ([]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	count := 0
+	var removed []string
 	for mac, r := range s.data {
 		if r.LastSeen.Before(cutoff) {
 			delete(s.data, mac)
-			count++
+			removed = append(removed, mac)
 		}
 	}
-	if count > 0 {
+	if len(removed) > 0 {
 		if err := s.save(); err != nil {
-			return 0, err
+			return nil, err
 		}
 	}
-	return count, nil
+	return removed, nil
 }
 
 // allDevices returns a sorted slice of all devices with online status set.

@@ -226,14 +226,25 @@ func runForget(args []string) {
 		actStore = activity.Empty()
 	}
 
+	tagStore, err := tags.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not load tags file: %v\n", err)
+		tagStore = tags.Empty()
+	}
+
 	if *olderThan > 0 {
 		cutoff := time.Now().AddDate(0, 0, -*olderThan)
-		n, err := stateStore.ForgetOlderThan(cutoff)
+		removed, err := stateStore.ForgetOlderThan(cutoff)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(exitcode.GeneralError)
 		}
-		fmt.Printf("Removed %d device(s)\n", n)
+		for _, mac := range removed {
+			actStore.Forget(mac)
+			tagStore.Forget(mac)
+		}
+		actStore.Save()
+		fmt.Printf("Removed %d device(s)\n", len(removed))
 		return
 	}
 
@@ -248,6 +259,7 @@ func runForget(args []string) {
 			os.Exit(exitcode.GeneralError)
 		}
 		actStore.Forget(mac)
+		tagStore.Forget(mac)
 		fmt.Printf("Removed %s\n", mac)
 	}
 	actStore.Save()

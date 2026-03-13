@@ -37,6 +37,12 @@ type labelSavedMsg struct {
 	err   error
 }
 
+// forgetDoneMsg is sent after a device forget completes.
+type forgetDoneMsg struct {
+	mac string
+	err error
+}
+
 // SortColumn identifies which column to sort by.
 type SortColumn int
 
@@ -303,6 +309,24 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.editing = true
 			return m, textinput.Blink
 
+		case "d":
+			devices := m.filteredDevices()
+			if len(devices) == 0 {
+				return m, nil
+			}
+			mac := devices[m.tbl.Cursor()].MAC
+			stateStore := m.stateStore
+			tagStore := m.tagStore
+			actStore := m.activityStore
+			return m, func() tea.Msg {
+				err := stateStore.Forget(mac)
+				if err == nil {
+					tagStore.Forget(mac)
+					actStore.Forget(mac)
+				}
+				return forgetDoneMsg{mac: mac, err: err}
+			}
+
 		case "up", "k":
 			m.tbl.MoveUp(1)
 		case "down", "j":
@@ -323,6 +347,23 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.editing = false
 		m.editInput.Blur()
 		m.editMAC = ""
+
+	case forgetDoneMsg:
+		if msg.err != nil {
+			m.err = msg.err
+		} else {
+			delete(m.tags, msg.mac)
+			delete(m.knownMACs, msg.mac)
+			delete(m.newMACs, msg.mac)
+			filtered := make([]state.Device, 0, len(m.allDevices))
+			for _, d := range m.allDevices {
+				if d.MAC != msg.mac {
+					filtered = append(filtered, d)
+				}
+			}
+			m.allDevices = filtered
+			refreshTable(&m)
+		}
 
 	case ScanCompleteMsg:
 		m.scanning = false

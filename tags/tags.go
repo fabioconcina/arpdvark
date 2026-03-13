@@ -76,6 +76,14 @@ func (s *Store) Set(mac, label string) error {
 	return s.save()
 }
 
+// Forget removes the label for the given MAC and persists to disk.
+func (s *Store) Forget(mac string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.data, mac)
+	return s.save()
+}
+
 // All returns a snapshot copy of all mac→label entries.
 func (s *Store) All() map[string]string {
 	s.mu.RLock()

@@ -287,7 +287,7 @@ func renderView(m M) string {
 			statusParts = append(statusParts, styleErr.Render("error: "+m.err.Error()))
 		}
 
-		statusParts = append(statusParts, "↵: details  e: label  ←→: sort col  s: sort dir  /: filter  o: offline  r: rescan  q: quit")
+		statusParts = append(statusParts, "↵: details  e: label  d: forget  ←→: sort col  s: sort dir  /: filter  o: offline  r: rescan  q: quit")
 		statusLine = styleStatus.Render(strings.Join(statusParts, "  •  "))
 	}
 

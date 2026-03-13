@@ -19,7 +19,7 @@ Requires Linux and CAP_NET_RAW. Install from source:
 
 Full-screen terminal UI with auto-refresh, keyboard navigation, label editing, and device detail view.
 
-Key bindings: q/ctrl+c quit; r rescan; up/down navigate; e edit label; left/right cycle sort column; s toggle sort direction; / filter (/ again to clear); o toggle offline; Enter open detail view.
+Key bindings: q/ctrl+c quit; r rescan; up/down navigate; e edit label; d forget device; left/right cycle sort column; s toggle sort direction; / filter (/ again to clear); o toggle offline; Enter open detail view.
 Detail view: shows all fields untruncated (IP, MAC, hostname, label, vendor, status, first/last seen) plus a weekly activity heatmap; up/down to navigate.
 Sorting: left/right arrows cycle through IP, MAC, Hostname, Label, Vendor, Last Seen; s toggles asc/desc.
 Filtering: / opens filter input; matches against all fields; Enter applies, Esc clears filter, / again also clears active filter.
@@ -132,7 +132,7 @@ as an ASCII heatmap using block characters (space, light, medium, dark, full) no
 to the maximum count. For continuous data collection, run periodic scans via cron:
 Add to your crontab (crontab -e):
 */5 * * * * /path/to/arpdvark --once > /dev/null 2>&1
-The `forget` subcommand also removes activity data for forgotten devices.
+The `forget` subcommand also removes activity data and labels for forgotten devices. In the TUI, press `d` to forget the selected device.
 
 In the TUI, previously known devices appear immediately on startup (dimmed as offline)
 before the first scan completes. Press `o` to toggle showing offline devices.
