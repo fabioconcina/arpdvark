@@ -12,7 +12,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/fabioconcina/arpdvark/activity"
-	"github.com/fabioconcina/arpdvark/latency"
 	"github.com/fabioconcina/arpdvark/state"
 )
 
@@ -21,8 +20,7 @@ const (
 	colWidthMAC      = 21
 	colWidthHostname = 28
 	colWidthLabel    = 20
-	colWidthLatency  = 10
-	numColumns       = 6
+	numColumns       = 5
 )
 
 var (
@@ -57,10 +55,10 @@ var (
 )
 
 // columnTitles are the base titles for each table column.
-var columnTitles = [numColumns]string{"IP Address", "MAC Address", "Hostname", "Label", "Vendor", "Latency"}
+var columnTitles = [numColumns]string{"IP Address", "MAC Address", "Hostname", "Label", "Vendor"}
 
 // columnSortCol maps table column index to SortColumn.
-var columnSortCol = [numColumns]SortColumn{SortIP, SortMAC, SortHostname, SortLabel, SortVendor, SortLatency}
+var columnSortCol = [numColumns]SortColumn{SortIP, SortMAC, SortHostname, SortLabel, SortVendor}
 
 // sortIndicator returns the arrow string for the active sort column.
 func sortIndicator(asc bool) string {
@@ -72,7 +70,7 @@ func sortIndicator(asc bool) string {
 
 // buildColumns returns table columns with a sort indicator on the active column.
 func buildColumns(sortCol SortColumn, sortAsc bool, vendorWidth int) []table.Column {
-	widths := [numColumns]int{colWidthIP, colWidthMAC, colWidthHostname, colWidthLabel, vendorWidth, colWidthLatency}
+	widths := [numColumns]int{colWidthIP, colWidthMAC, colWidthHostname, colWidthLabel, vendorWidth}
 	cols := make([]table.Column, numColumns)
 	for i := 0; i < numColumns; i++ {
 		title := columnTitles[i]
@@ -104,7 +102,7 @@ func updateColumns(m *M) {
 	if m.width == 0 {
 		return
 	}
-	vendorWidth := m.width - 2 - colWidthIP - colWidthMAC - colWidthHostname - colWidthLabel - colWidthLatency - numColumns*2
+	vendorWidth := m.width - 2 - colWidthIP - colWidthMAC - colWidthHostname - colWidthLabel - numColumns*2
 	if vendorWidth < 10 {
 		vendorWidth = 10
 	}
@@ -126,8 +124,7 @@ func applySize(m M) M {
 	if m.width == 0 || m.height == 0 {
 		return m
 	}
-	// 2 padding + 10 cell padding (5 cols × 2)
-	vendorWidth := m.width - 2 - colWidthIP - colWidthMAC - colWidthHostname - colWidthLabel - colWidthLatency - numColumns*2
+	vendorWidth := m.width - 2 - colWidthIP - colWidthMAC - colWidthHostname - colWidthLabel - numColumns*2
 	if vendorWidth < 10 {
 		vendorWidth = 10
 	}
@@ -151,7 +148,7 @@ func devicesToRows(devices []state.Device, tags map[string]string) []table.Row {
 	rows := make([]table.Row, len(devices))
 	for i, d := range devices {
 		rows[i] = table.Row{
-			d.IP, d.MAC, d.Hostname, tags[d.MAC], d.Vendor, formatLatency(d.Latency),
+			d.IP, d.MAC, d.Hostname, tags[d.MAC], d.Vendor,
 		}
 	}
 	return rows
@@ -185,21 +182,6 @@ func dimOfflineRows(view string, devices []state.Device) string {
 	return strings.Join(lines, "\n")
 }
 
-// formatLatency formats a duration as a short latency string.
-func formatLatency(d time.Duration) string {
-	if d <= 0 {
-		return "-"
-	}
-	if d < time.Millisecond {
-		return fmt.Sprintf("%dus", d.Microseconds())
-	}
-	ms := float64(d) / float64(time.Millisecond)
-	if ms < 10 {
-		return fmt.Sprintf("%.1fms", ms)
-	}
-	return fmt.Sprintf("%dms", int(ms))
-}
-
 // sortColumnName returns the display name for a sort column.
 func sortColumnName(col SortColumn) string {
 	switch col {
@@ -213,8 +195,6 @@ func sortColumnName(col SortColumn) string {
 		return "Label"
 	case SortVendor:
 		return "Vendor"
-	case SortLatency:
-		return "Latency"
 	case SortLastSeen:
 		return "Last Seen"
 	default:
@@ -245,16 +225,6 @@ func sortDevices(devices []state.Device, col SortColumn, asc bool, tags map[stri
 			less = strings.ToLower(tags[devices[i].MAC]) < strings.ToLower(tags[devices[j].MAC])
 		case SortVendor:
 			less = strings.ToLower(devices[i].Vendor) < strings.ToLower(devices[j].Vendor)
-		case SortLatency:
-			// 0 means no measurement; sort those last (treat as max).
-			a, b := devices[i].Latency, devices[j].Latency
-			if a == 0 {
-				a = time.Hour
-			}
-			if b == 0 {
-				b = time.Hour
-			}
-			less = a < b
 		case SortLastSeen:
 			less = devices[i].LastSeen.Before(devices[j].LastSeen)
 		default:
@@ -328,7 +298,7 @@ func renderView(m M) string {
 }
 
 // detailFieldCount is the number of fields shown in the detail view.
-const detailFieldCount = 9
+const detailFieldCount = 8
 
 // renderDetail renders the device detail panel.
 func renderDetail(m M) string {
@@ -350,7 +320,6 @@ func renderDetail(m M) string {
 		{"Hostname", d.Hostname},
 		{"Label", label},
 		{"Vendor", d.Vendor},
-		{"Latency", formatLatency(d.Latency)},
 		{"Status", status},
 		{"First Seen", d.FirstSeen.Format("2006-01-02 15:04")},
 		{"Last Seen", d.LastSeen.Format("2006-01-02 15:04")},
@@ -375,17 +344,12 @@ func renderDetail(m M) string {
 	heatmapStr := "\n" + styleDim.Render("Weekly Activity") + "\n" +
 		styleDim.Render(activity.Heatmap(m.activityStore.Get(d.MAC)))
 
-	// Latency history box plot.
-	latStats := m.latencyStore.Get(d.MAC)
-	latencyStr := "\n" + styleDim.Render("Latency History") + "\n" +
-		styleDim.Render(latency.Boxplot(latStats))
-
 	statusLine := styleStatus.Render("↑↓: navigate  esc / ↵: back")
 
 	sep := separator(m.width)
 	padTitle := " " + title
 	padStatus := " " + statusLine
-	body := padTitle + "\n" + sep + "\n\n" + strings.Join(rows, "\n") + "\n" + heatmapStr + "\n" + latencyStr + "\n\n" + sep + "\n" + padStatus
+	body := padTitle + "\n" + sep + "\n\n" + strings.Join(rows, "\n") + "\n" + heatmapStr + "\n\n" + sep + "\n" + padStatus
 	return body
 }
 

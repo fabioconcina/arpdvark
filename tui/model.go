@@ -12,7 +12,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/fabioconcina/arpdvark/activity"
-	"github.com/fabioconcina/arpdvark/latency"
 	"github.com/fabioconcina/arpdvark/notify"
 	"github.com/fabioconcina/arpdvark/scanner"
 	"github.com/fabioconcina/arpdvark/state"
@@ -47,7 +46,6 @@ const (
 	SortHostname
 	SortLabel
 	SortVendor
-	SortLatency
 	SortLastSeen
 	sortColumnCount // sentinel for wrapping
 )
@@ -93,12 +91,11 @@ type M struct {
 	newMACs   map[string]bool // MACs discovered for the first time this session
 
 	activityStore *activity.Store
-	latencyStore  *latency.Store
 	notifyURL     string
 }
 
 // New creates a new TUI model.
-func New(sc *scanner.Scanner, store *tags.Store, stateStore *state.Store, actStore *activity.Store, latStore *latency.Store, interval time.Duration, version string, notifyURL string) M {
+func New(sc *scanner.Scanner, store *tags.Store, stateStore *state.Store, actStore *activity.Store, interval time.Duration, version string, notifyURL string) M {
 	ti := textinput.New()
 	ti.Placeholder = "enter label (empty to clear)"
 	ti.CharLimit = 64
@@ -133,7 +130,6 @@ func New(sc *scanner.Scanner, store *tags.Store, stateStore *state.Store, actSto
 		knownMACs:     knownMACs,
 		newMACs:       make(map[string]bool),
 		activityStore: actStore,
-		latencyStore:  latStore,
 		notifyURL:     notifyURL,
 	}
 }
@@ -221,7 +217,6 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "q", "ctrl+c":
 				m.activityStore.Save()
-				m.latencyStore.Save()
 				return m, tea.Quit
 			}
 			return m, nil
@@ -230,7 +225,6 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			m.activityStore.Save()
-			m.latencyStore.Save()
 			return m, tea.Quit
 
 		case "esc":
@@ -361,15 +355,6 @@ func (m M) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				onlineMACs[i] = d.MAC.String()
 			}
 			m.activityStore.Record(onlineMACs, time.Now())
-
-			// Record latency history.
-			latencies := make(map[string]time.Duration)
-			for _, d := range msg.Devices {
-				if d.Latency > 0 {
-					latencies[d.MAC.String()] = d.Latency
-				}
-			}
-			m.latencyStore.RecordAll(latencies)
 
 			allDevs, err := m.stateStore.Merge(msg.Devices)
 			if err != nil {

@@ -23,7 +23,7 @@ type Device struct {
 	Hostname  string
 	FirstSeen time.Time
 	LastSeen  time.Time
-	Latency   time.Duration // ICMP round-trip time; 0 means no measurement
+
 }
 
 // Scanner performs ARP scans on a network interface.
@@ -198,13 +198,6 @@ outer:
 		}(ipStr)
 	}
 
-	// Build temporary Device list for pinging (only need IPs).
-	pingDevs := make([]Device, len(replies))
-	for i, r := range replies {
-		pingDevs[i] = Device{IP: r.IP}
-	}
-	latencies := pingDevices(pingDevs)
-
 	hostnames := make(map[string]string, len(replies))
 	for range replies {
 		res := <-dnsCh
@@ -231,9 +224,6 @@ outer:
 		}
 		existing.Hostname = hostnames[key]
 		existing.LastSeen = now
-		if rtt, ok := latencies[key]; ok {
-			existing.Latency = rtt
-		}
 		s.seen[key] = existing
 	}
 
