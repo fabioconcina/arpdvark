@@ -114,14 +114,14 @@ func TestDevicesToRows_NoLabel(t *testing.T) {
 	}
 }
 
-func TestDevicesToRows_OfflinePrefix(t *testing.T) {
+func TestDevicesToRows_OfflineNoPrefix(t *testing.T) {
 	devices := []state.Device{
 		{IP: "192.168.1.1", MAC: "aa:bb:cc:dd:ee:ff", Vendor: "Acme", Online: false},
 	}
 	rows := devicesToRows(devices, nil)
-	want := "○ 192.168.1.1"
-	if rows[0][0] != want {
-		t.Errorf("offline device IP = %q, want %q", rows[0][0], want)
+	// Offline devices no longer get a prefix; dimming is applied to the rendered row instead.
+	if rows[0][0] != "192.168.1.1" {
+		t.Errorf("offline device IP = %q, want %q", rows[0][0], "192.168.1.1")
 	}
 }
 

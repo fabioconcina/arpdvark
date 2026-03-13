@@ -145,18 +145,44 @@ func applySize(m M) M {
 // devicesToRows converts state devices to table rows.
 // Cell values are plain text only — the bubbles table uses runewidth.Truncate
 // which is not ANSI-aware and corrupts escape sequences.
+// Offline devices are visually distinguished by dimming the entire rendered row
+// in dimOfflineRows, not by modifying cell content.
 func devicesToRows(devices []state.Device, tags map[string]string) []table.Row {
 	rows := make([]table.Row, len(devices))
 	for i, d := range devices {
-		ip := d.IP
-		if !d.Online {
-			ip = "○ " + d.IP
-		}
 		rows[i] = table.Row{
-			ip, d.MAC, d.Hostname, tags[d.MAC], d.Vendor, formatLatency(d.Latency),
+			d.IP, d.MAC, d.Hostname, tags[d.MAC], d.Vendor, formatLatency(d.Latency),
 		}
 	}
 	return rows
+}
+
+// dimOfflineRows applies dim styling to rendered table lines for offline devices.
+// It post-processes the table View() output so we avoid ANSI in cell values.
+func dimOfflineRows(view string, devices []state.Device) string {
+	offlineIPs := make(map[string]bool)
+	for _, d := range devices {
+		if !d.Online {
+			offlineIPs[d.IP] = true
+		}
+	}
+	if len(offlineIPs) == 0 {
+		return view
+	}
+
+	lines := strings.Split(view, "\n")
+	for i := 1; i < len(lines); i++ {
+		line := lines[i]
+		// Header and selected rows contain ANSI escapes; skip them.
+		if strings.Contains(line, "\x1b[") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) > 0 && offlineIPs[fields[0]] {
+			lines[i] = styleDim.Render(line)
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // formatLatency formats a duration as a short latency string.
@@ -247,7 +273,7 @@ func renderView(m M) string {
 		"  •  interface: " + m.iface +
 		"  •  subnet: " + m.subnet
 
-	tableStr := m.tbl.View()
+	tableStr := dimOfflineRows(m.tbl.View(), m.filteredDevices())
 
 	var statusLine string
 	if m.editing {
