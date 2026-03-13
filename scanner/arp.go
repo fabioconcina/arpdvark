@@ -40,7 +40,7 @@ func sendARP(client *arp.Client, targetIP, srcIP net.IP, srcMAC net.HardwareAddr
 	return client.WriteTo(pkt, net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff})
 }
 
-func collectReplies(client *arp.Client, done <-chan struct{}) []arpReply {
+func collectReplies(client *arp.Client, subnet *net.IPNet, done <-chan struct{}) []arpReply {
 	var replies []arpReply
 	for {
 		// Use a short read deadline so we can check the done signal between reads.
@@ -59,6 +59,9 @@ func collectReplies(client *arp.Client, done <-chan struct{}) []arpReply {
 		}
 		if pkt.Operation == arp.OperationReply {
 			ip := net.IP(pkt.SenderIP.AsSlice())
+			if !subnet.Contains(ip) {
+				continue
+			}
 			replies = append(replies, arpReply{IP: ip, MAC: pkt.SenderHardwareAddr})
 		}
 	}

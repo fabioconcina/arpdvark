@@ -118,7 +118,7 @@ func (s *Scanner) Scan(ctx context.Context) ([]Device, error) {
 	doneCh := make(chan struct{})
 	replyCh := make(chan []arpReply, 1)
 	go func() {
-		replyCh <- collectReplies(recvClient, doneCh)
+		replyCh <- collectReplies(recvClient, s.subnet, doneCh)
 	}()
 
 	// Rate-limit sends: 1000 pkt/s for small subnets, 5000 for larger ones.
