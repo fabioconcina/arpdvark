@@ -15,8 +15,8 @@ import (
 	"github.com/fabioconcina/arpdvark/tags"
 )
 
-// Run starts the MCP server on stdio and blocks until it exits.
-func Run(version string) error {
+// NewServer creates a configured MCP server without starting it.
+func NewServer(version string) *server.MCPServer {
 	s := server.NewMCPServer(
 		"arpdvark",
 		version,
@@ -38,7 +38,12 @@ func Run(version string) error {
 
 	s.AddTool(tool, handleScan)
 
-	return server.ServeStdio(s)
+	return s
+}
+
+// Run starts the MCP server on stdio and blocks until it exits.
+func Run(version string) error {
+	return server.ServeStdio(NewServer(version))
 }
 
 func handleScan(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
