@@ -4,7 +4,14 @@
 
 ## Quick start
 
-Requires Linux and CAP_NET_RAW. Install from source:
+Requires Linux and CAP_NET_RAW. Download a prebuilt binary from the latest release:
+
+    curl -Lo arpdvark https://github.com/fabioconcina/arpdvark/releases/latest/download/arpdvark-linux-amd64
+    chmod +x arpdvark
+    sudo setcap cap_net_raw+ep ./arpdvark
+    ./arpdvark
+
+Or build from source:
 
     git clone https://github.com/fabioconcina/arpdvark
     cd arpdvark && make build

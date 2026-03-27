@@ -49,21 +49,33 @@ IP Address       MAC Address         Hostname        Label     Vendor
 
 ## Installation
 
-**From source:**
+Download a prebuilt binary from [the latest release](https://github.com/fabioconcina/arpdvark/releases/latest):
+
+```sh
+# Linux (x86_64)
+curl -Lo arpdvark https://github.com/fabioconcina/arpdvark/releases/latest/download/arpdvark-linux-amd64
+chmod +x arpdvark
+
+# Linux (ARM64 / Raspberry Pi)
+curl -Lo arpdvark https://github.com/fabioconcina/arpdvark/releases/latest/download/arpdvark-linux-arm64
+chmod +x arpdvark
+```
+
+Grant network access (once per binary):
+
+```sh
+sudo setcap cap_net_raw+ep ./arpdvark
+./arpdvark
+```
+
+Or build from source:
 
 ```sh
 git clone https://github.com/fabioconcina/arpdvark
 cd arpdvark
 make build-all          # produces dist/arpdvark-linux-amd64 and dist/arpdvark-linux-arm64
+sudo setcap cap_net_raw+ep dist/arpdvark-linux-amd64
 ```
-
-Copy the appropriate binary to your Linux machine and grant it network access:
-
-```sh
-sudo setcap cap_net_raw+ep /path/to/arpdvark
-```
-
-This only needs to be run once after each build or deploy. After that, arpdvark runs without `sudo`.
 
 ## Usage
 
