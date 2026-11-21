@@ -6,20 +6,34 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
-  test-and-build:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          go-version-file: go.mod
+          persist-credentials: false
 
-      - name: Test
-        run: go test ./...
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27"
+          check-latest: true
 
       - name: Build
-        run: make build-all
+        run: go build -v ./...
+
+      # Release binaries also ship for linux/arm64 (Raspberry Pi); a cross
+      # build catches anything that only breaks there.
+      - name: Build (linux/arm64)
         env:
-          VERSION: ${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+          GOARCH: arm64
+        run: go build ./...
+
+      - name: Test
+        run: go test -v -race -count=1 ./...
+
+      - name: Vet
+        run: go vet ./...

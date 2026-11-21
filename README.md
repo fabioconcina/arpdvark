@@ -10,7 +10,7 @@
 [![Go version](https://img.shields.io/github/go-mod/go-version/fabioconcina/arpdvark)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> **Experimental project** — built to learn Go, TUI development, and raw networking. Intended for use on home networks only. Not hardened for production or adversarial environments.
+> **Home networks only.** arpdvark is meant for scanning networks you own or administer. It is not hardened for production or adversarial environments.
 
 A minimal, fast terminal-based network inventory tool. Scans your local network using ARP, identifies connected devices, resolves hostnames and MAC vendors, and displays results in a full-screen auto-refreshing TUI.
 
@@ -31,21 +31,20 @@ IP Address       MAC Address         Hostname        Label     Vendor
 
 ## Features
 
-- **ARP scanning** — discovers all active hosts on the local subnet using raw ARP packets
-- **Hostname resolution** — tries three methods in order: system DNS, gateway DNS (dnsmasq/home routers), mDNS unicast (Bonjour/Avahi)
-- **MAC vendor lookup** — identifies hardware vendors from the embedded [IEEE OUI registry](https://standards-oui.ieee.org/oui/oui.txt) (~39k entries)
-- **Locally administered MAC detection** — flags randomized, VM-assigned, or manually set MACs as `Local/Randomized` (these have no OUI entry by design)
-- **Full-screen TUI** — fills the terminal, resizes dynamically, auto-refreshes on a configurable interval
-- **Persistent device table** — devices seen in previous scans remain visible; `LastSeen`, MAC, and vendor are updated on each round
-- **Device persistence** — scan results are saved to `~/.config/arpdvark/state.json` across runs, tracking first-seen/last-seen timestamps and online/offline status; the TUI shows previously known devices immediately on startup
-- **Host labels** — assign custom names to any device; labels are keyed by MAC address and persist across restarts in `~/.config/arpdvark/tags.json`
-- **Multi-round first scan** — the first ARP sweep sends 3 rounds of requests (100 ms apart) to catch slow responders such as Wi-Fi clients in power-save mode; subsequent scans send a single round since the device table accumulates across sweeps
-- **Column sorting** — use `←`/`→` to cycle sort column (IP, MAC, Hostname, Label, Vendor, Last Seen); press `s` to toggle ascending/descending
-
-- **Device filtering** — press `/` to filter the device table by any field; matches IP, MAC, hostname, label, and vendor; press `/` again to clear
-- **New device alerts** — devices seen for the first time (not in the state file from previous runs) are highlighted in green in the TUI, with a count in the status bar
-- **Activity heatmap** — the detail view shows a weekly activity pattern (7 days x 24 hours) built from scan history, using block characters to visualize when a device is typically connected; activity is recorded in all modes (TUI, `--json`, `--once`) and persisted to `~/.config/arpdvark/activity.json`
-- **Rate-limited scanning** — ARP requests are rate-limited (1000 pkt/s for /24 and smaller, 5000 pkt/s for larger subnets) to avoid overwhelming switches or triggering IDS alerts
+- **ARP scanning**: discovers all active hosts on the local subnet using raw ARP packets
+- **Hostname resolution**: tries three methods in order: system DNS, gateway DNS (dnsmasq/home routers), mDNS unicast (Bonjour/Avahi)
+- **MAC vendor lookup**: identifies hardware vendors from the embedded [IEEE OUI registry](https://standards-oui.ieee.org/oui/oui.txt) (~39k entries)
+- **Locally administered MAC detection**: flags randomized, VM-assigned, or manually set MACs as `Local/Randomized` (these have no OUI entry by design)
+- **Full-screen TUI**: fills the terminal, resizes dynamically, auto-refreshes on a configurable interval
+- **Persistent device table**: devices seen in previous scans remain visible; `LastSeen`, MAC, and vendor are updated on each round
+- **Device persistence**: scan results are saved to `~/.config/arpdvark/state.json` across runs, tracking first-seen/last-seen timestamps and online/offline status; the TUI shows previously known devices immediately on startup
+- **Host labels**: assign custom names to any device; labels are keyed by MAC address and persist across restarts in `~/.config/arpdvark/tags.json`
+- **Multi-round first scan**: the first ARP sweep sends 3 rounds of requests (100 ms apart) to catch slow responders such as Wi-Fi clients in power-save mode; subsequent scans send a single round since the device table accumulates across sweeps
+- **Column sorting**: use `←`/`→` to cycle sort column (IP, MAC, Hostname, Label, Vendor, Last Seen); press `s` to toggle ascending/descending
+- **Device filtering**: press `/` to filter the device table by any field; matches IP, MAC, hostname, label, and vendor; press `/` again to clear
+- **New device alerts**: devices seen for the first time (not in the state file from previous runs) are highlighted in green in the TUI, with a count in the status bar
+- **Activity heatmap**: the detail view shows a weekly activity pattern (7 days x 24 hours) built from scan history, using block characters to visualize when a device is typically connected; activity is recorded in all modes (TUI, `--json`, `--once`) and persisted to `~/.config/arpdvark/activity.json`
+- **Rate-limited scanning**: ARP requests are rate-limited (1000 pkt/s for /24 and smaller, 5000 pkt/s for larger subnets) to avoid overwhelming switches or triggering IDS alerts
 
 ## Installation
 
@@ -75,6 +74,19 @@ git clone https://github.com/fabioconcina/arpdvark
 cd arpdvark
 make build-all          # produces dist/arpdvark-linux-amd64 and dist/arpdvark-linux-arm64
 sudo setcap cap_net_raw+ep dist/arpdvark-linux-amd64
+```
+
+### Verifying a download
+
+Release binaries are built by GitHub Actions from the tagged commit. Each release includes `checksums.txt`, an SPDX SBOM per binary, and a build provenance attestation. To check a binary downloaded as `./arpdvark`:
+
+```sh
+# The hash must match the arpdvark-linux-<arch> line
+curl -sL https://github.com/fabioconcina/arpdvark/releases/latest/download/checksums.txt
+sha256sum arpdvark
+
+# Confirms it was built by this repo's release workflow (needs the gh CLI)
+gh attestation verify arpdvark --repo fabioconcina/arpdvark
 ```
 
 ## Usage
@@ -125,7 +137,7 @@ arpdvark -i eth0 --large
 | `Enter` | Open device detail view |
 | `Esc` / `Enter` | Close detail view / close filter / cancel label edit |
 
-**Detail view** (`Enter` on a row): shows all device fields untruncated — IP, MAC, hostname, label, vendor, status, first seen, last seen — plus a weekly activity heatmap. Navigate fields with `↑`/`↓`.
+**Detail view** (`Enter` on a row): shows all device fields untruncated (IP, MAC, hostname, label, vendor, status, first seen, last seen), plus a weekly activity heatmap. Navigate fields with `↑`/`↓`.
 
 ### JSON output (`--json`)
 
@@ -236,9 +248,9 @@ Exit codes apply to `--json` and `--once` modes:
 
 Hostnames are resolved concurrently for all discovered devices after each ARP sweep. Three methods are tried in order:
 
-1. **System resolver** — uses `/etc/resolv.conf`. Works if your DNS server (e.g. Pi-hole with DHCP enabled) maintains PTR records.
-2. **Gateway DNS** — queries the default gateway (read from `/proc/net/route`, falling back to the first host in the subnet) directly on port 53. Home routers running dnsmasq create PTR records for DHCP leases automatically.
-3. **mDNS unicast** — sends a PTR query to the device's port 5353. Works for Apple devices (Bonjour) and Linux hosts running Avahi.
+1. **System resolver**: uses `/etc/resolv.conf`. Works if your DNS server (e.g. Pi-hole with DHCP enabled) maintains PTR records.
+2. **Gateway DNS**: queries the default gateway (read from `/proc/net/route`, falling back to the first host in the subnet) directly on port 53. Home routers running dnsmasq create PTR records for DHCP leases automatically.
+3. **mDNS unicast**: sends a PTR query to the device's port 5353. Works for Apple devices (Bonjour) and Linux hosts running Avahi.
 
 If all three fail (e.g. the device has a randomized MAC and no mDNS), the hostname column is left empty.
 
@@ -251,7 +263,7 @@ make update-oui
 make build-all
 ```
 
-MACs with the **locally administered bit** set (second least-significant bit of the first octet) are shown as `Local/Randomized` regardless of the OUI table — these addresses are self-assigned and have no registered manufacturer.
+MACs with the **locally administered bit** set (second least-significant bit of the first octet) are shown as `Local/Randomized` regardless of the OUI table. These addresses are self-assigned and have no registered manufacturer.
 
 ## License
 

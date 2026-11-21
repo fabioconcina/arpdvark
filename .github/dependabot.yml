@@ -1,0 +1,26 @@
+version: 2
+
+# Grouped so each ecosystem opens at most one version-update PR a week.
+# Security updates are not grouped and arrive as soon as an advisory lands.
+# The cooldown skips releases younger than a week, which is when poisoned
+# packages are usually caught and yanked.
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      go:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]

@@ -1,0 +1,37 @@
+version: 2
+
+# Linux only: the scanner needs raw AF_PACKET sockets (cap_net_raw).
+builds:
+  - binary: arpdvark
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+# Bare binaries named arpdvark-linux-{arch}, so the README's
+# releases/latest/download URLs keep working.
+archives:
+  - id: binaries
+    formats:
+      - binary
+    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
+
+sboms:
+  - artifacts: binary
+    disable: false
+
+# The release workflow attests dist/checksums.txt; keep the name stable
+# instead of goreleaser's default {project}_{version}_checksums.txt.
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  header: "{{ .Env.RELEASE_NOTES }}"
+
+changelog:
+  disable: true

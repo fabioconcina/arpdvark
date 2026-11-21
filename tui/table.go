@@ -303,7 +303,7 @@ const detailFieldCount = 8
 // renderDetail renders the device detail panel.
 func renderDetail(m M) string {
 	d := m.detailDevice
-	title := styleTitle.Render("device detail") + "  —  " + d.IP
+	title := styleTitle.Render("device detail") + "  ·  " + d.IP
 
 	label := m.tags[d.MAC]
 	if label == "" {

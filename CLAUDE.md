@@ -1,23 +1,28 @@
-# arpdvark — Claude instructions
+# arpdvark: Claude instructions
 
 ## Versioning and releases
 
 - Always bump the version after implementing a change (before committing)
-- "bump the version and commit" means: update the git tag (e.g. v0.3.0), commit all changes, tag
-- "create a release" means: build both linux/amd64 and linux/arm64 via `make build-all`, then `gh release create`
+- Releases are cut by CI. To release vX.Y.Z:
+  1. Write `RELEASE_NOTES.md` for the new version (it becomes the GitHub release body)
+  2. Commit and push to `main`
+  3. Push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
+- The `v*` tag triggers `.github/workflows/release.yml`, which runs goreleaser (linux amd64 + arm64 binaries, `checksums.txt`, SBOMs) and attests the checksums
+- Never run goreleaser locally (beyond `goreleaser check`) and never use `gh release create`
 - Always run tests before committing (see Build section for test commands)
 
 ## Build
 
 - Always Linux only (`GOOS=linux`)
-- `make build` → `./arpdvark` (local dev build)
+- `make build` → `./arpdvark` (local dev build, linux/amd64)
 - `make build-all` → `dist/arpdvark-linux-amd64` + `dist/arpdvark-linux-arm64`
-- Tests: `go test ./tags/... ./vendor_db/... ./output/... ./exitcode/...` (no build tag needed); `go test -tags linux ./tui/... ./scanner/...` (Linux-only, run in CI)
+- `make test` (`go test -race -count=1 ./...`) and `make vet`
+- `scanner` and `tui` tests carry `//go:build linux`, so on macOS they are skipped; CI runs them on Linux. Cross-check with `GOOS=linux go build ./... && GOOS=linux go vet ./...`
 
 ## Deploying to server
 
 - Always set the version via ldflags: `go build -ldflags "-X main.version=vX.Y.Z"`
-- Never use bare `go build` without ldflags — the binary will show "dev" as the version
+- Never use bare `go build` without ldflags: the binary will show "dev" as the version
 
 ## Documentation
 

@@ -106,8 +106,6 @@ Claude Desktop configuration example:
     arpdvark forget [MAC ...]           Remove specific devices from state
     arpdvark forget --older-than N      Remove devices not seen in N days
 
-## Permissions
-
 ## Scanning behavior
 
 The first ARP sweep sends 3 rounds of requests (100 ms apart) to catch slow responders
